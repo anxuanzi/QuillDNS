@@ -24,12 +24,21 @@ export interface Metrics {
   cache: number
   upstream: number
   errors: number
+  dropped_logs: number
+  average_latency_ms: number
+}
+export interface Session {
+  mode?: string
+  authenticated: boolean
+  email?: string
+  subject?: string
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch('/api/v1' + path, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers }
+    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    credentials: 'same-origin'
   })
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
@@ -40,8 +49,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export const api = {
   records: () => request<{ data: DNSRecord[] }>('/records'),
   createRecord: (record: Omit<DNSRecord, 'id'>) => request<DNSRecord>('/records', { method: 'POST', body: JSON.stringify(record) }),
+  updateRecord: (id: string, record: Omit<DNSRecord, 'id'>) => request<DNSRecord>('/records/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(record) }),
   deleteRecord: (id: string) => request<void>('/records/' + encodeURIComponent(id), { method: 'DELETE' }),
   metrics: () => request<Metrics>('/metrics/summary'),
   queries: () => request<{ data: QueryEvent[] }>('/queries'),
-  lookup: (name: string, type: string) => request<{ rcode: string, answers: string[] }>('/dns/resolve', { method: 'POST', body: JSON.stringify({ name, type }) })
+  lookup: (name: string, type: string) => request<{ rcode: string, answers: string[] }>('/dns/resolve', { method: 'POST', body: JSON.stringify({ name, type }) }),
+  session: () => request<Session>('/session'),
+  logout: async () => {
+    const response = await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    if (!response.ok) throw new Error('Unable to sign out')
+  }
 }

@@ -1,3 +1,3 @@
 # Overview UI
 
-Displays cumulative in-memory DNS counters, latest query events and real operational status from the Go backend. No fabricated telemetry or mandatory external metrics service. Historical roll-ups and retention-backed reporting are not yet implemented.
+Displays actual integrated DNS counters (process lifetime) and a live resolver breakdown, including error and dropped-log indicators. Also offers an in-process DNS test backed by the management API. The UI never requires Prometheus or Grafana.

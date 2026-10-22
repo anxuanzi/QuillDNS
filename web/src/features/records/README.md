@@ -1,5 +1,5 @@
-# DNS records UI
+# DNS record management UI
 
-The records feature owns the table, mutation form, and transport-facing view state. Pinia Colada owns server state. All validation and business invariants are enforced again by the Go records domain.
+This domain owns record listing, text search, adding, editing, deleting and conditional fields by RR type. Server state belongs to Pinia Colada. The Go records bounded context remains authoritative for validation and conflict prevention.
 
-The initial interface supports create/delete for A, AAAA, TXT, CNAME, PTR, MX and SRV records. Record edits, wildcards, CAA, bulk management, and record-set grouping remain follow-up work.
+CRUD supports A, AAAA, CNAME, TXT, MX, SRV and PTR. Wildcard records, bulk import/export, CAA and more complex DNS service records remain planned. The API persists records before replacing the immutable in-memory lookup snapshot.
