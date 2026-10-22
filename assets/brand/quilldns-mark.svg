@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none" role="img" aria-labelledby="title desc">
+<title id="title">QuillDNS mark</title><desc id="desc">A gradient quill within a protective DNS orbit</desc>
+<defs>
+<linearGradient id="orbit" x1="28" y1="40" x2="206" y2="231" gradientUnits="userSpaceOnUse"><stop stop-color="#38e8db"/><stop offset=".50" stop-color="#4c9fff"/><stop offset="1" stop-color="#9b71f8"/></linearGradient>
+<linearGradient id="feather" x1="177" y1="37" x2="66" y2="217" gradientUnits="userSpaceOnUse"><stop stop-color="#42e9ed"/><stop offset=".47" stop-color="#5199ff"/><stop offset="1" stop-color="#9a71f7"/></linearGradient>
+</defs>
+<path d="M111.5 28C64.8 28 28 66.7 28 115c0 25.7 10.2 49.1 27.4 65.7" stroke="url(#orbit)" stroke-width="13.5" stroke-linecap="round"/>
+<path d="M200.6 99.8c7 12.2 11 26.3 11 41.3 0 45.4-36.8 82.2-82.2 82.2-15.8 0-30.6-4.4-43.2-12.1" stroke="url(#orbit)" stroke-width="13.5" stroke-linecap="round"/>
+<path d="M66 211c.6-39.1 13.8-70.8 38.4-96.1 29.2-30 69.2-48.9 106.8-82.8 6.4 51.3-11.5 97.4-43.1 126.6C141 183.8 108.5 196.1 66 211Z" fill="url(#feather)"/>
+<path d="M60 223c26.8-53.4 64.9-101.1 118.9-146.4" stroke="#10192e" stroke-width="10" stroke-linecap="round"/>
+<path d="m105 147 48-13M128 114l39-7M86 175l44-9" stroke="#122a52" stroke-opacity=".58" stroke-width="6" stroke-linecap="round"/>
+<path d="M60 223c26.8-53.4 64.9-101.1 118.9-146.4" stroke="#e7f9ff" stroke-opacity=".75" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,23 @@
+name: Bun lockfile migration
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/bun-lock-bootstrap.yml'
+  workflow_dispatch:
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.5'
+      - name: Generate verified Bun lock
+        working-directory: web
+        run: |
+          bun install --lockfile-only
+          echo "QUILL_BUN_LOCK_BEGIN"
+          base64 -w0 bun.lock
+          echo
+          echo "QUILL_BUN_LOCK_END"

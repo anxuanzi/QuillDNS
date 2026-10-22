@@ -22,8 +22,8 @@ const views = { overview: OverviewPage, records: RecordsPage, queries: QueriesPa
     <div class="shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark" aria-hidden="true">✒</span>
-          <span>QuillDNS<span style="color:#52dab3">.</span></span>
+          <img class="brand-mark" src="/brand/quilldns-mark.svg" width="42" height="42" alt="" aria-hidden="true" />
+          <span class="brand-name">Quill<span class="brand-name-accent">DNS</span></span>
         </div>
         <div class="nav-heading">Workspace</div>
         <nav class="nav" aria-label="Main navigation">

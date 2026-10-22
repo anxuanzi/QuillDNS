@@ -7,9 +7,12 @@ body { background:#080e18; margin:0; color:#e7eff9; }
 .shell { display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh }
 .sidebar { border-right:1px solid #213041;background:#0a1421;padding:28px 16px;position:relative; }
 .brand { display:flex;align-items:center;gap:11px;padding:0 12px 32px;font-weight:750;font-size:19px;letter-spacing:-.4px; }
-.brand-mark { display:grid;place-items:center;background:linear-gradient(135deg,#32ddae,#168cb4);border-radius:12px;color:#032329;width:37px;height:37px;font-size:21px;box-shadow:0 5px 25px #13caa126; }
+.brand-mark { display:block;width:42px;height:42px;flex-shrink:0;filter:drop-shadow(0 7px 16px #5791ff42); }
+.brand-name {letter-spacing:-.65px}
+.brand-name-accent {background:linear-gradient(90deg,#37d4e9,#668ef8,#a87cf7);background-clip:text;-webkit-background-clip:text;color:transparent}
+.brand {gap:10px}
 .nav-item { width:100%;display:flex;align-items:center;gap:12px;border:0;background:transparent;color:#9badc4;text-align:left;padding:13px 14px;border-radius:10px;font-size:14px;cursor:pointer;transition:background .15s ease,color .15s ease; }
-.nav-item.active { background:#15382f;color:#7aebba;font-weight:650; }
+.nav-item.active { background:linear-gradient(105deg,#173a4b,#25294c);color:#9bc9ff;font-weight:650;border:1px solid #567ef32a; }
 .nav-item:hover { background:#182535; }
 .nav-item:focus-visible { outline:2px solid #56dcb5;outline-offset:2px }
 .nav-heading { font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:#61758c;padding:28px 14px 12px;font-weight:800; }
@@ -20,7 +23,7 @@ body { background:#080e18; margin:0; color:#e7eff9; }
 .side-sub {font-size:11px;color:#557087;margin-top:5px;}
 .main { padding:38px clamp(24px,4.4vw,70px);max-width:1650px;width:100%;margin:0 auto;box-sizing:border-box; }
 .top-header {display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap; }
-.eyebrow { font-size:11px;letter-spacing:.17em;text-transform:uppercase;color:#45caa4;font-weight:800; }
+.eyebrow { font-size:11px;letter-spacing:.17em;text-transform:uppercase;color:#68c7ed;font-weight:800; }
 .eyebrow-divider {color:#456273;margin:0 5px;}
 .h1 { font-size:clamp(30px,3.2vw,43px);letter-spacing:-1.6px;font-weight:760;margin:8px 0; }
 .subheading { color:#92a4b9;font-size:13px;line-height:1.6; }

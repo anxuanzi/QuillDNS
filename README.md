@@ -1,6 +1,10 @@
-# QuillDNS
+<div align="center">
+  <img src="assets/brand/quilldns-wordmark.svg" width="610" alt="QuillDNS — DNS, under your control" />
+</div>
 
-**DNS, under your control.**
+<h1 align="center">QuillDNS</h1>
+
+<p align="center"><strong>DNS, under your control.</strong> High-performance, self-hosted DNS with built-in management and observability.</p>
 
 QuillDNS is a lightweight, open-source Go DNS override proxy with a self-contained Vue 3 management SPA. Local records take precedence over public DNS, and unmatched name/type lookups use configurable public upstream resolvers. It includes an in-process TTL-aware response cache, transactional embedded SQLite record storage, optional OpenID Connect sign-in, and first-party query analytics. **Pre-release: not yet certified for exposed production networks.**
 
