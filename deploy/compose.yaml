@@ -1,25 +1,30 @@
-# Local/trusted Linux host deployment. Enable OIDC before exposing management remotely.
+# QuillDNS self-contained Linux deployment: pull from GHCR; no local build needed.
+# Defaults to loopback only. For LAN DNS or remote UI access, see README.md.
 services:
   quilldns:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
+    image: ghcr.io/anxuanzi/quilldns:${QUILLDNS_IMAGE_TAG:-edge}
     restart: unless-stopped
     network_mode: host
-    command:
-      - -data
-      - /data/quilldns.db
-      - -dns
-      - "127.0.0.1:1053"
-      - -http
-      - "127.0.0.1:8080"
-      - -allow-networks
-      - "127.0.0.0/8,::1/128"
+    environment:
+      QUILLDNS_DATA_PATH: /data/quilldns.db
+      QUILLDNS_DNS_LISTEN: ${QUILLDNS_DNS_LISTEN:-127.0.0.1:1053}
+      QUILLDNS_HTTP_LISTEN: ${QUILLDNS_HTTP_LISTEN:-127.0.0.1:8080}
+      QUILLDNS_UPSTREAMS: ${QUILLDNS_UPSTREAMS:-1.1.1.1:53,8.8.8.8:53}
+      QUILLDNS_ALLOW_NETWORKS: ${QUILLDNS_ALLOW_NETWORKS:-127.0.0.0/8,::1/128}
+      QUILLDNS_OIDC_ISSUER: ${QUILLDNS_OIDC_ISSUER:-}
+      QUILLDNS_OIDC_CLIENT_ID: ${QUILLDNS_OIDC_CLIENT_ID:-}
+      QUILLDNS_OIDC_CLIENT_SECRET: ${QUILLDNS_OIDC_CLIENT_SECRET:-}
+      QUILLDNS_PUBLIC_URL: ${QUILLDNS_PUBLIC_URL:-}
+      QUILLDNS_OIDC_ALLOWED_EMAILS: ${QUILLDNS_OIDC_ALLOWED_EMAILS:-}
     volumes:
       - quilldns_data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
-    read_only: true
 
 volumes:
   quilldns_data:
