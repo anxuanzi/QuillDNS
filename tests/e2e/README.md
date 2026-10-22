@@ -21,3 +21,7 @@ python tests/e2e/test_console.py
 **Only run against a disposable database**: tests create DNS records. CI uploads actual browser screenshots as `quilldns-ui-screenshots`. These are not promotional mockups and do not contain production user data.
 
 When modifying the UI, review both the automated assertions and the resulting 1440px/390px screenshots for clipping, hierarchy, contrast, focus states and responsive layout.
+
+## UI quality checks
+
+The test sends real UDP DNS queries into the resolver, waits for durable five-minute aggregation, and inspects actual Vue Charts SVG geometry on desktop and mobile. The geometry assertion rejects charts that extend outside their frame or overlap the following dashboard panels. Browser checks also verify pointer cursors on actual buttons, combobox triggers, and option rows, plus theme persistence and loading-state recovery.
