@@ -1,0 +1,13 @@
+# Local state
+/data/
+*.db
+*.db-*
+.env
+# Frontend
+node_modules/
+web/node_modules/
+webassets/dist/*
+!webassets/dist/index.html
+# Builds
+/bin/
+coverage.out
