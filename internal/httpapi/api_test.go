@@ -83,3 +83,15 @@ func TestRejectInvalidPayloadAndClientIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestObservabilityEndpoints(t *testing.T) {
+	h:=fixture(t)
+	for _, path:=range []string{"/api/v1/metrics/summary","/api/v1/metrics/trend"} {
+		r:=httptest.NewRecorder()
+		h.ServeHTTP(r,httptest.NewRequest("GET",path,nil))
+		if r.Code != 200 {t.Fatalf("%s: %d %s",path,r.Code,r.Body.String())}
+	}
+	r:=httptest.NewRecorder()
+	h.ServeHTTP(r,httptest.NewRequest("POST","/api/v1/dns/resolve",bytes.NewBufferString(`{"name":"local.test","type":"A"}`)))
+	if r.Code != 200 || !bytes.Contains(r.Body.Bytes(),[]byte("duration_ms")) {t.Fatalf("lookup timing: %d %s",r.Code,r.Body.String())}
+}

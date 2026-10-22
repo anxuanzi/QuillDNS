@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +33,11 @@ type Summary struct {
 	Errors           uint64  `json:"errors"`
 	Dropped          uint64  `json:"dropped_logs"`
 	AverageLatencyMS float64 `json:"average_latency_ms"`
+	P95LatencyMS float64 `json:"p95_latency_ms"`
+	P99LatencyMS float64 `json:"p99_latency_ms"`
+	LocalAvgLatencyMS float64 `json:"local_avg_latency_ms"`
+	CacheAvgLatencyMS float64 `json:"cache_avg_latency_ms"`
+	UpstreamAvgLatencyMS float64 `json:"upstream_avg_latency_ms"`
 }
 type Collector struct {
 	mu           sync.RWMutex
@@ -41,6 +47,9 @@ type Collector struct {
 	full         bool
 	summary      Summary
 	totalLatency float64
+	localLatency float64
+	cacheLatency float64
+	upstreamLatency float64
 	db           *sql.DB
 	queue        chan Event
 	done         chan struct{}
@@ -93,10 +102,13 @@ func (c *Collector) Record(e Event) {
 	switch e.Source {
 	case "local":
 		c.summary.Local++
+		c.localLatency += e.DurationMS
 	case "cache":
 		c.summary.Cache++
+		c.cacheLatency += e.DurationMS
 	case "upstream":
 		c.summary.Upstream++
+		c.upstreamLatency += e.DurationMS
 	}
 	if e.Rcode != "NOERROR" {
 		c.summary.Errors++
@@ -115,7 +127,30 @@ func (c *Collector) Record(e Event) {
 func (c *Collector) Summary() Summary {
 	c.mu.RLock()
 	out := c.summary
+	if out.Local > 0 {
+		out.LocalAvgLatencyMS = c.localLatency / float64(out.Local)
+	}
+	if out.Cache > 0 {
+		out.CacheAvgLatencyMS = c.cacheLatency / float64(out.Cache)
+	}
+	if out.Upstream > 0 {
+		out.UpstreamAvgLatencyMS = c.upstreamLatency / float64(out.Upstream)
+	}
+	// Percentiles reflect only the bounded in-memory window, not lifetime history.
+	n := c.next
+	if c.full {
+		n = c.max
+	}
+	latencies := make([]float64, n)
+	for i := 0; i < n; i++ {
+		latencies[i] = c.events[i].DurationMS
+	}
 	c.mu.RUnlock()
+	if n > 0 {
+		sort.Float64s(latencies)
+		out.P95LatencyMS = latencies[(95*n+99)/100-1]
+		out.P99LatencyMS = latencies[(99*n+99)/100-1]
+	}
 	out.Dropped = c.dropped.Load()
 	return out
 }

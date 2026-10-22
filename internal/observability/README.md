@@ -9,3 +9,9 @@ Every DNS query creates a small in-memory event and contributes to cumulative pr
 - During overload, log events may be dropped instead of delaying DNS; `dropped_logs` reports that condition.
 - Client IP and hostname are sensitive operational data. Restrict access and backups appropriately.
 - Historical aggregations, configurable retention, privacy controls and detailed upstream timings need further work.
+
+## Native performance analytics
+
+The summary exposes process-lifetime average latency, rolling p95/p99 latencies from the bounded in-memory event ring, and per-resolution-source mean latencies (local, cache, upstream). Percentiles are **not lifetime percentiles**. The trend endpoint groups persistent events into twelve five-minute buckets for the past hour, including zero-query intervals. When configured with a memory-only collector it uses the ring, which may omit older events.
+
+REST: `GET /api/v1/metrics/summary`, `GET /api/v1/metrics/trend`, and `GET /api/v1/queries`. The DNS lookup-testing endpoint also includes `duration_ms` for each requested test.

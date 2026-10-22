@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/anxuanzi/QuillDNS/internal/dnsserver"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
@@ -39,6 +40,14 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/records/{id}", a.update)
 	mux.HandleFunc("DELETE /api/v1/records/{id}", a.delete)
 	mux.HandleFunc("GET /api/v1/metrics/summary", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, a.Telemetry.Summary()) })
+	mux.HandleFunc("GET /api/v1/metrics/trend", func(w http.ResponseWriter, r *http.Request) {
+		points, err := a.Telemetry.Trend(r.Context(), time.Now())
+		if err != nil {
+			problem(w, 503, "query history unavailable")
+			return
+		}
+		respond(w, 200, map[string]any{"data": points, "bucket_seconds": 300})
+	})
 	mux.HandleFunc("GET /api/v1/queries", func(w http.ResponseWriter, r *http.Request) {
 		data, err := a.Telemetry.Recent(r.Context(), 100)
 		if err != nil {
@@ -186,6 +195,7 @@ func (a *API) lookup(w http.ResponseWriter, r *http.Request) {
 		problem(w, 400, "unsupported DNS type")
 		return
 	}
+	started := time.Now()
 	result, err := a.DNS.Lookup(r.Context(), name, qtype)
 	if err != nil {
 		problem(w, 502, "DNS lookup failed")
@@ -195,7 +205,7 @@ func (a *API) lookup(w http.ResponseWriter, r *http.Request) {
 	for _, rr := range result.Answer {
 		answers = append(answers, rr.String())
 	}
-	respond(w, 200, map[string]any{"rcode": dns.RcodeToString[result.Rcode], "answers": answers})
+	respond(w, 200, map[string]any{"rcode": dns.RcodeToString[result.Rcode], "answers": answers, "duration_ms": float64(time.Since(started).Microseconds()) / 1000})
 }
 func ListenAddress() string { return net.JoinHostPort("127.0.0.1", "8080") }
 
