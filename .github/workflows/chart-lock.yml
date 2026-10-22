@@ -1,0 +1,21 @@
+name: Chart lockfile bootstrap
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/chart-lock.yml']
+jobs:
+  lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.3.5'
+      - name: Resolve chart dependency lockfile
+        working-directory: web
+        run: |
+          bun install --lockfile-only
+          echo "QUILL_CHART_LOCK_BEGIN"
+          base64 -w0 bun.lock
+          echo
+          echo "QUILL_CHART_LOCK_END"
