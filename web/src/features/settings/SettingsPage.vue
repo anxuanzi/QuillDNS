@@ -3,6 +3,10 @@ import { ref, watch } from 'vue'
 import { useQuery, useQueryCache } from '@pinia/colada'
 import { api } from '../../lib/api'
 
+const { data: metrics } = useQuery({ key: ['metrics'], query: api.metrics })
+const averageUpstream = () => (metrics.value?.upstream ?? 0) > 0
+  ? (metrics.value?.upstream_avg_latency_ms ?? 0).toFixed(2) + ' ms'
+  : 'No samples yet'
 const { data: session, error: sessionError } = useQuery({ key: ['session'], query: api.session })
 const { data: upstreams, error: upstreamError } = useQuery({ key: ['upstreams'], query: api.upstreams })
 const queryCache = useQueryCache()
@@ -54,7 +58,8 @@ async function logout() {
         <UButton icon="i-lucide-check" :disabled="!edited || !addresses.length || applying" :loading="applying" @click="applyUpstreams">Apply settings</UButton>
         <p v-if="upstreamError" class="notice-error">{{ upstreamError.message }}</p>
         <p v-if="feedback" role="status" class="footnote">{{ feedback }}</p>
-        <p class="footnote">Use IPv4:port or [IPv6]:port. Maximum eight resolvers.</p>
+        <div class="inline-metric"><span>Observed upstream processing time</span><strong>{{ averageUpstream() }}</strong></div>
+        <p class="footnote">Average across all completed forwarded queries since startup (not per-resolver health probing). Use IPv4:port or [IPv6]:port. Maximum eight resolvers.</p>
       </div>
     </div>
     <div class="panel">

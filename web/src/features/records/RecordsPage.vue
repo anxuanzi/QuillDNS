@@ -10,6 +10,7 @@ const editID = ref<string | null>(null)
 const showModal = ref(false)
 const search = ref('')
 const notice = ref('')
+const formError = ref('')
 const pending = ref(false)
 const queryCache = useQueryCache()
 const { data, error, status } = useQuery({ key: ['records'], query: api.records })
@@ -17,19 +18,21 @@ const records = computed(() => data.value?.data ?? [])
 const filtered = computed(() => records.value.filter(r =>
   (r.name + r.value + r.type).toLowerCase().includes(search.value.toLowerCase())
 ))
-function openCreate() { editID.value = null; form.value = defaultForm(); notice.value = ''; showModal.value = true }
+function openCreate() { editID.value = null; form.value = defaultForm(); notice.value = ''; formError.value = ''; showModal.value = true }
 function openEdit(record: DNSRecord) {
   if (pending.value) return
   editID.value = record.id
   const { id: _id, ...data } = record
   form.value = { ...defaultForm(), ...data }
   notice.value = ''
+  formError.value = ''
   showModal.value = true
 }
 async function submit() {
   if (pending.value) return
   pending.value = true
   notice.value = ''
+  formError.value = ''
   const payload = {
     ...form.value,
     ttl: Number(form.value.ttl),
@@ -49,7 +52,7 @@ async function submit() {
     showModal.value = false
     await queryCache.invalidateQueries({ key: ['records'] })
   } catch (error) {
-    notice.value = error instanceof Error ? error.message : 'Unable to save DNS record'
+    formError.value = error instanceof Error ? error.message : 'Unable to save DNS record'
   } finally {
     pending.value = false
   }
@@ -109,6 +112,7 @@ async function deleteRecord(record: DNSRecord) {
   <UModal v-model:open="showModal" :title="editID ? 'Edit DNS record' : 'Add DNS record'" description="Manage your local DNS overrides without restarting the resolver.">
     <template #body>
       <form id="record-editor" class="editor-form" @submit.prevent="submit">
+        <div v-if="formError" role="alert" class="notice-error">{{ formError }}</div>
         <div><label class="field-label" for="record-name">Hostname</label><UInput id="record-name" v-model="form.name" placeholder="api.internal.example" class="w-full" required /></div>
         <div class="grid2">
           <div><label class="field-label">Record type</label><USelect v-model="form.type" :items="['A','AAAA','CNAME','TXT','MX','SRV','PTR','CAA']" class="w-full" /></div>
