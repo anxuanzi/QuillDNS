@@ -1,45 +1,67 @@
-# QuillDNS architecture and engineering guide
+# QuillDNS architecture
 
-## Principles
-- Business behavior lives in domain packages; transport handlers depend on domain interfaces and never own DNS invariants.
-- A DNS lookup must not depend on a database or frontend request.
-- Never introduce a required external service for metrics, caching, configuration, or query storage.
-- Prefer small, reviewable components; document important decisions, test the observable behavior, and avoid abstraction without a use case.
-- Version API boundaries. Validate DNS data server-side.
-- Deny unsafe public access by default.
+QuillDNS is a Go-native DNS override proxy with an embedded Vue 3 control plane, a dedicated API, and first-party observability. It requires no Redis, PostgreSQL, Prometheus, Grafana or separate Node server at runtime.
+
+## Topology
+
+```mermaid
+flowchart TD
+  DNS[DNS Clients UDP/TCP] --> ACL[CIDR Access Policy]
+  ACL --> RES[Go DNS Resolver]
+  RES --> LOCAL[Immutable Local RRsets]
+  RES --> CACHE[Bounded TTL Response Cache]
+  RES --> UP[Public Upstreams]
+  ADMIN[Browser - Vue SPA] --> AUTH[Optional OIDC Session]
+  AUTH --> API[Go HTTP API]
+  API --> REC[(SQLite Records)]
+  API --> CFG[(SQLite Resolver Settings)]
+  REC -- snapshot publication --> LOCAL
+  CFG -- atomic publication --> UP
+  RES --> TELEMETRY[Built-in Query Events]
+  TELEMETRY --> LOGDB[(SQLite Query History)]
+  API --> LOGDB
+```
 
 ## Bounded contexts
-| Domain | Ownership | Current persistence |
+
+| Context | Package | Responsibility |
 |---|---|---|
-| Records | normalization, RR validation, conflict rules, immutable snapshots | atomic JSON file |
-| Resolution | local-first DNS, upstreams, response cache | in-memory |
-| Observability | query events and aggregate counters | in-memory bounded ring |
-| Management | HTTP orchestration / DTOs | delegates to domains |
-| Web | operational workflows | browser-only UI state |
+| Record management | `internal/records` | Canonicalization, record invariants, SQLite transactions, immutable snapshots |
+| Resolution | `internal/dnsserver` | UDP/TCP DNS, local-first lookup, positive caching, upstream fallback and client policy |
+| Resolver settings | `internal/settings` | Validated ordered upstreams, durable settings |
+| Observability | `internal/observability` | Bounded in-memory counters, nonblocking asynchronous SQLite query history |
+| Management API | `internal/httpapi` | Versioned request/response protocol, orchestration |
+| Authentication | `internal/auth` | OIDC Code + PKCE, ID token validation and short-lived browser sessions |
+| Frontend | `web/src/features` | View-specific Vue components, Pinia Colada server state and Nuxt UI |
+| Embedded UI | `webassets` | Static file embedding into the Go executable with `go:embed` |
 
-The initial modules are separated by Go package and documented with local README files. Keep interfaces near consumers rather than creating a generic services framework.
+## DNS query contract
 
-## Testing contract
-- Unit tests: normalization, RR conversion, type-specific fallback, CNAME conflicts, persistence.
-- API tests: valid/invalid mutations, response shape, cross-origin denial.
-- DNS tests: local answers, upstream delegation, positive cache.
-- Upcoming: RFC edge cases, EDNS and DNSSEC pass-through, truncation, client controls, concurrency race tests, browser automation, performance benchmarks.
-- CI must execute `go test ./...`, `go vet ./...`, frontend typechecking and frontend build.
+1. Validate client CIDR and DNS question. Reject unauthorized clients with REFUSED.
+2. Look for a matching locally defined RRset by fully qualified name and type. CNAME is an alias override and conflicts with other types at the same name.
+3. If no local match, consult the bounded positive cache, unless EDNS or DNSSEC-sensitive options require bypass.
+4. Forward to upstream resolvers in order, retrying truncated UDP replies over TCP.
+5. Emit bounded in-memory telemetry and asynchronous history with no SQL writes on the DNS hot path.
 
-## Known compromises in foundation
-1. JSON persistence is intentional for a working vertical slice; SQLite with transactional migrations is the planned embedded storage layer.
-2. A response cache is included but is not yet a hardened DNS cache. EDNS requests bypass it and positive-cache response TTLs need thorough protocol tests.
-3. The current query history is memory-only, with a fixed maximum size. SQLite-backed retention and rolling metrics are planned.
-4. OIDC is **not** currently available. Bind management to loopback until an authentication implementation passes security review.
-5. Restrict DNS listeners to private interfaces. Network ACLs, rate limiting, and abuse protections are not complete.
-6. The frontend ships embedded only after `npm run build`.
+**Split-horizon override semantics:** A local A override for `api.example.com` does not block a public TXT query for that same hostname. This is different from an authoritative DNS zone; it is a purposeful user-facing product policy.
 
-## Milestones
-1. DNS protocol correctness and resilient upstream behavior.
-2. Transactional embedded storage and dynamic settings.
-3. OIDC provider integration, sessions and CSRF protections.
-4. Durable in-product query telemetry and latency histograms.
-5. Deployment, packaging, integration tests and load benchmarks.
+## Management lifecycle
 
-## Record fallback contract
-QuillDNS is an **override proxy**, not an authoritative DNS zone by default. Only a matching local RRset intercepts the request; other types at the same name forward to public upstreams. CNAME acts as an alias override and has special conflict constraints. DNSSEC cannot truthfully authenticate synthetic records; design explicit AD flag handling and downstream expectations before general use.
+Record writes validate the full prospective set, persist through embedded SQLite, and publish an immutable snapshot. Queries never access SQLite. Upstream settings similarly persist and publish atomically to the resolver; the existing public response cache is invalidated on upstream change. The Vue SPA uses API endpoints rather than directly accessing any database or server internals.
+
+## Authentication and private-network defaults
+
+With no OIDC configuration, management binds only to loopback, and the DNS listener defaults to loopback with loopback client CIDRs. Configure OIDC and an HTTPS reverse proxy for remote browser access. Explicitly allow trusted client CIDRs when serving a private subnet. Never expose unrestricted recursive DNS to the internet.
+
+## Current limitations / release blockers
+
+- DNS cache is deliberately conservative and currently caches positive responses only; test full RFC and DNSSEC semantics.
+- Upstreams support UDP/TCP, not yet DNS-over-HTTPS/TLS/QUIC, active health scoring or circuit-breaker selection.
+- TXT/MX/SRV and other common local records are supported, but wildcard records, HTTPS/SVCB/CAA and complete zone-authoritative behavior are not complete.
+- Client access restrictions exist, but sustained-abuse rate limiting and realistic load testing are pending.
+- OIDC is implemented but needs identity-provider integration tests, refresh/session lifecycle review, and security audit before broad exposure.
+- Query history persists with bounded event queues; configurable privacy controls and richer historical analytics are outstanding.
+- Cross-platform packaging and full browser-based end-to-end tests are outstanding.
+- Automated race-enabled tests and builds are necessary, but do not constitute proof of production readiness.
+
+See [testing](testing.md), [security](../SECURITY.md), and [deployment](../deploy/README.md).
