@@ -89,7 +89,8 @@ async function lookup() {
           :data="chartData"
           index="time"
           :categories="volumeSeries"
-          class="h-48 w-full"
+          :height="186"
+          class="w-full"
           aria-label="Real DNS queries over the last hour"
         />
         <p v-else class="trend-empty">No traffic history collected yet.</p>
@@ -110,7 +111,8 @@ async function lookup() {
           :data="chartData"
           index="time"
           :categories="latencySeries"
-          class="h-48 w-full"
+          :height="186"
+          class="w-full"
           aria-label="Average DNS response latency over the last hour"
         />
         <p v-else class="trend-empty">No latency history collected yet.</p>
