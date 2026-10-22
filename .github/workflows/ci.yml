@@ -24,3 +24,16 @@ jobs:
         run: go test -race ./...
       - name: Vet
         run: go vet ./...
+      - name: Export formatted sources for review
+        run: |
+          find cmd internal webassets -type f -name '*.go' | sort | while read -r f; do
+            echo "QUILL_SOURCE_BEGIN:$f"
+            base64 "$f"
+            echo "QUILL_SOURCE_END"
+          done
+          echo "QUILL_SOURCE_BEGIN:go.mod"
+          base64 go.mod
+          echo "QUILL_SOURCE_END"
+          echo "QUILL_SOURCE_BEGIN:go.sum"
+          base64 go.sum
+          echo "QUILL_SOURCE_END"
