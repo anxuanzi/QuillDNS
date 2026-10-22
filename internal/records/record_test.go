@@ -26,8 +26,8 @@ func TestValidate(t *testing.T) {
 }
 func TestStoreLocalAndFallback(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "records.sqlite")
- s, e := Open(path)
- defer s.Close()
+	s, e := Open(path)
+	defer s.Close()
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -47,7 +47,7 @@ func TestStoreLocalAndFallback(t *testing.T) {
 		t.Fatal(e)
 	}
 	defer s2.Close()
- if _, ok = s2.Lookup("api.example.com", dns.TypeA); !ok {
+	if _, ok = s2.Lookup("api.example.com", dns.TypeA); !ok {
 		t.Fatal("persistence failed")
 	}
 	if e = s2.Delete("1"); e != nil {

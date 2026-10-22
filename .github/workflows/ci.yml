@@ -17,23 +17,18 @@ jobs:
           node-version: '22'
       - name: Build frontend
         run: npm install --prefix web && npm run build --prefix web
-      - name: Resolve Go dependencies
-        run: go mod tidy
-      - name: Format Go
-        run: gofmt -w cmd internal webassets
-      - name: Go tests and race detection
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l cmd internal webassets)"
+      - name: Test Go with race detector
         run: go test -race ./...
-      - name: Vet
+      - name: Vet Go
         run: go vet ./...
-      - name: Export normalized source files for repository synchronization
+      - name: Confirm Go module metadata is tidy
         run: |
-          find cmd internal webassets -type f -name '*.go' | sort | while read -r f; do
-            echo "QUILL_SOURCE_BEGIN:$f"
-            base64 "$f"
-            echo "QUILL_SOURCE_END"
-          done
-          for f in go.mod go.sum; do
-            echo "QUILL_SOURCE_BEGIN:$f"
-            base64 "$f"
-            echo "QUILL_SOURCE_END"
-          done
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Export frontend lockfile for reproducible releases
+        run: |
+          echo "QUILL_NPM_LOCK_BEGIN"
+          base64 web/package-lock.json
+          echo "QUILL_NPM_LOCK_END"
