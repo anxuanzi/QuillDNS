@@ -57,17 +57,27 @@ An embedded Vue 3 SPA, SQLite storage, optional OIDC login, and no external runt
 
 The simplest way to explore QuillDNS is on your own machine, with DNS and the management UI both bound to loopback.
 
-### Option A — Docker (Linux)
+### Option A — Pull the prebuilt Docker image (Linux)
+
+No Go or Bun installation is required. Docker Compose pulls QuillDNS from **GitHub Container Registry**:
 
 ```bash
-git clone https://github.com/anxuanzi/QuillDNS.git
-cd QuillDNS
-docker compose -f deploy/compose.yaml up --build -d
+mkdir quilldns && cd quilldns
+curl -fsSLo compose.yaml https://raw.githubusercontent.com/anxuanzi/QuillDNS/main/deploy/compose.yaml
+docker compose up -d
 ```
 
-Visit **http://127.0.0.1:8080**. DNS listens on **127.0.0.1:1053** over UDP and TCP.
+Open **http://127.0.0.1:8080** on the Docker host. DNS listens on **127.0.0.1:1053** (UDP/TCP). All settings and query history persist in the named Docker volume.
 
-> Docker Compose uses Linux host networking. For other platforms or remote hosts, adapt the network configuration and access policy; see [deployment guidance](deploy/README.md).
+```bash
+docker compose pull             # fetch a newer image
+docker compose up -d            # restart with persistent data
+docker compose logs -f          # inspect resolver logs
+```
+
+<sub>Default image: `ghcr.io/anxuanzi/quilldns:edge` (tested main-branch builds). Stable `:latest` and semver tags are reserved for versioned releases. GHCR packages may initially be private; package owners must enable Public visibility for anonymous pulls.</sub>
+
+> **Safety:** The default Linux host-network deployment is loopback-only, with no public recursive DNS or remote management. To serve your LAN, configure explicit client CIDRs and a private-interface listener. See [Docker deployment and environment variables](deploy/README.md).
 
 ### Option B — Go + Bun
 
@@ -146,7 +156,25 @@ A Vue 3 + Nuxt UI single-page application, built with **Vite and Bun** and embed
 | **Settings** | Manage DNS upstreams and inspect authentication settings |
 | **DNS Lookup** | Test DNS resolution from the management UI |
 
-**Actual interface captures:** the [browser acceptance workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/browser-e2e.yml) runs Chromium against the compiled Go binary and uploads desktop/mobile screenshots. These are real application captures, not generated mockups. Open a successful run and download the `quilldns-ui-screenshots` artifact.
+**Actual interface captures:** the [CI workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/ci.yml) invokes real Chromium tests against the compiled Go binary and uploads desktop/mobile screenshots. These are real captures, not generated mockups. Open a successful CI run's `browser / chromium` job and download its `quilldns-ui-screenshots` artifact.
+
+## Docker environment configuration
+
+The Go server now supports `QUILLDNS_*` environment variables for containerized deployments. CLI flags remain supported and **override** env values when both are supplied.
+
+| Environment variable | Image default | Purpose |
+|:--|:--|:--|
+| `QUILLDNS_DATA_PATH` | `/data/quilldns.db` | SQLite configuration and query-history storage |
+| `QUILLDNS_DNS_LISTEN` | `127.0.0.1:1053` | DNS UDP/TCP listener |
+| `QUILLDNS_HTTP_LISTEN` | `127.0.0.1:8080` | Embedded management UI + API |
+| `QUILLDNS_ALLOW_NETWORKS` | `127.0.0.0/8,::1/128` | Permitted DNS client subnets |
+| `QUILLDNS_UPSTREAMS` | `1.1.1.1:53,8.8.8.8:53` | Comma-separated fallback resolvers |
+
+The image also accepts the optional `QUILLDNS_OIDC_*` authentication variables. Copy [the Docker Compose environment example](deploy/.env.example) to customize an installation. Run `cd deploy && docker compose up -d` from a cloned repository, or keep a downloaded `compose.yaml` alongside your `.env` file.
+
+## Automated Docker images
+
+The [CI workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/ci.yml) tests the Go resolver, Vue UI in Chrome, and the container before publishing a multi-architecture image to **[GHCR](https://github.com/anxuanzi/QuillDNS/pkgs/container/quilldns)**. `main` publishes `:edge` and an immutable commit-SHA tag; `vX.Y.Z` tags publish semver tags and, for stable releases, `:latest`. Full details are in [the deployment guide](deploy/README.md).
 
 ## Configuration & security
 
@@ -195,7 +223,7 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
-The standard [CI workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/ci.yml) checks formatting, race tests, static analysis, Bun/Vite compilation, Docker packaging and a restart-persistence smoke test. Separate [browser acceptance tests](tests/e2e/README.md) check the embedded SPA using Playwright and publish actual screenshots.
+The [CI workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/ci.yml) checks formatting, race tests, static analysis, Bun/Vite compilation, Docker packaging and a restart-persistence smoke test. It also runs the reusable [Chromium acceptance suite](tests/e2e/README.md), which captures real UI screenshots, **before** allowing a GHCR image publication.
 
 ## Documentation
 
