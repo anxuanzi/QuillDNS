@@ -10,6 +10,7 @@ const editID = ref<string | null>(null)
 const showModal = ref(false)
 const search = ref('')
 const notice = ref('')
+const pending = ref(false)
 const queryCache = useQueryCache()
 const { data, error, status } = useQuery({ key: ['records'], query: api.records })
 const records = computed(() => data.value?.data ?? [])
@@ -18,12 +19,12 @@ const filtered = computed(() => records.value.filter(r =>
 ))
 const create = useMutation({
   mutation: api.createRecord,
-  onSuccess: async () => { showModal.value = false; notice.value = 'DNS record created'; await queryCache.invalidateQueries({ key: ['records'] }) },
-  onError: e => { notice.value = e.message }
+  onSuccess: async () => { pending.value = false; showModal.value = false; notice.value = 'DNS record created'; await queryCache.invalidateQueries({ key: ['records'] }) },
+  onError: e => { pending.value = false; notice.value = e.message }
 })
 const update = useMutation({
   mutation: (input: { id: string; data: Editable }) => api.updateRecord(input.id, input.data),
-  onSuccess: async () => { showModal.value = false; notice.value = 'DNS record updated'; await queryCache.invalidateQueries({ key: ['records'] }) },
+  onSuccess: async () => { pending.value = false; showModal.value = false; notice.value = 'DNS record updated'; await queryCache.invalidateQueries({ key: ['records'] }) },
   onError: e => { notice.value = e.message }
 })
 const remove = useMutation({
@@ -40,7 +41,9 @@ function openEdit(record: DNSRecord) {
   showModal.value = true
 }
 function submit() {
+  if (pending.value) return
   notice.value = ''
+  pending.value = true
   const payload = { ...form.value, ttl: Number(form.value.ttl), priority: Number(form.value.priority), weight: Number(form.value.weight), port: Number(form.value.port), flags: Number(form.value.flags ?? 0) }
   if (editID.value) update.mutate({ id: editID.value, data: payload })
   else create.mutate(payload)
@@ -48,7 +51,6 @@ function submit() {
 function deleteRecord(record: DNSRecord) {
   if (window.confirm('Delete ' + record.name + ' (' + record.type + ')?')) remove.mutate(record.id)
 }
-const pending = computed(() => create.status.value === 'pending' || update.status.value === 'pending')
 </script>
 
 <template>
