@@ -92,6 +92,10 @@ The visual identity is maintained in [the branding guide](docs/brand/README.md).
 | Vue SPA | [web/README.md](web/README.md) |
 | Design decisions and roadmap | [docs/architecture.md](docs/architecture.md) |
 
+## Interface previews
+
+The [Browser acceptance and screenshots workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/browser-e2e.yml) tests the actual embedded Vue app and attaches downloadable PNG screenshots of Overview, Records, Add Record, Lookup, Query Logs, Settings, and mobile Overview. These are captured from a disposable test instance, rather than simulated product mockups.
+
 ## Release maturity
 
 The current implementation is an actively tested foundation, **not a final production release**. Remaining high-priority verification includes DNS fuzzing, full protocol/EDNS/DNSSEC handling, session/redirect security review, configuration migration, upstream health/failover tests, E2E browser tests, backups and restore drills, and reproducible release artifacts. See [architecture](docs/architecture.md).
