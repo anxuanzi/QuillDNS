@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { useQuery, useQueryCache } from '@pinia/colada'
 import { api } from '../../lib/api'
 
 const { data: session, error: sessionError } = useQuery({ key: ['session'], query: api.session })
@@ -9,12 +9,24 @@ const queryCache = useQueryCache()
 const addresses = ref<string[]>([])
 const edited = ref(false)
 const feedback = ref('')
+const applying = ref(false)
 watch(upstreams, value => { if (value && !edited.value) addresses.value = [...value.data] }, { immediate: true })
-const save = useMutation({
-  mutation: api.setUpstreams,
-  onSuccess: async () => { edited.value = false; feedback.value = 'Upstream DNS configuration saved and activated'; await queryCache.invalidateQueries({ key: ['upstreams'] }) },
-  onError: e => { feedback.value = e.message }
-})
+async function applyUpstreams() {
+  if (applying.value || !edited.value || !addresses.value.length) return
+  applying.value = true
+  feedback.value = ''
+  try {
+    const result = await api.setUpstreams([...addresses.value])
+    addresses.value = [...result.data]
+    edited.value = false
+    feedback.value = 'Upstream DNS configuration saved and activated'
+    await queryCache.invalidateQueries({ key: ['upstreams'] })
+  } catch (error) {
+    feedback.value = error instanceof Error ? error.message : 'Unable to save upstreams'
+  } finally {
+    applying.value = false
+  }
+}
 function addAddress() { addresses.value = [...addresses.value, '']; edited.value = true }
 function changeAddress(index: number, value: string) { addresses.value[index] = value; edited.value = true }
 function removeAddress(index: number) { addresses.value.splice(index, 1); edited.value = true }
@@ -35,11 +47,11 @@ async function logout() {
           Resolver {{ index + 1 }}
           <div class="resolver-input-row">
             <UInput :model-value="item" placeholder="1.1.1.1:53" class="w-full" @update:model-value="(value: string | number) => changeAddress(index, String(value))" />
-            <UButton icon="i-lucide-trash-2" variant="ghost" color="error" :aria-label="'Remove resolver ' + (index + 1)" @click="removeAddress(index)" />
+            <UButton icon="i-lucide-trash-2" variant="ghost" color="error" :aria-label="'Remove resolver ' + (index + 1)"  :disabled="applying" @click="removeAddress(index)" />
           </div>
         </label>
-        <UButton color="neutral" variant="outline" icon="i-lucide-plus" @click="addAddress">Add upstream</UButton>
-        <UButton icon="i-lucide-check" :disabled="!edited || !addresses.length" :loading="save.status.value === 'pending'" @click="save.mutate(addresses)">Apply settings</UButton>
+        <UButton color="neutral" variant="outline" icon="i-lucide-plus"  :disabled="applying" @click="addAddress">Add upstream</UButton>
+        <UButton icon="i-lucide-check" :disabled="!edited || !addresses.length || applying" :loading="applying" @click="applyUpstreams">Apply settings</UButton>
         <p v-if="upstreamError" class="notice-error">{{ upstreamError.message }}</p>
         <p v-if="feedback" role="status" class="footnote">{{ feedback }}</p>
         <p class="footnote">Use IPv4:port or [IPv6]:port. Maximum eight resolvers.</p>

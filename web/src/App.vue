@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useColorMode } from './lib/theme'
 import OverviewPage from './features/overview/OverviewPage.vue'
 import RecordsPage from './features/records/RecordsPage.vue'
 import QueriesPage from './features/queries/QueriesPage.vue'
@@ -13,6 +14,8 @@ const navigation: { key: Page, label: string, icon: string }[] = [
   { key: 'queries', label: 'Query Logs', icon: 'i-lucide-chart-no-axes-combined' },
   { key: 'settings', label: 'Settings', icon: 'i-lucide-settings-2' }
 ]
+const { mode, toggle } = useColorMode()
+const copyrightYear = new Date().getFullYear()
 const current = computed(() => navigation.find(item => item.key === page.value)!)
 const views = { overview: OverviewPage, records: RecordsPage, queries: QueriesPage, settings: SettingsPage }
 </script>
@@ -42,8 +45,13 @@ const views = { overview: OverviewPage, records: RecordsPage, queries: QueriesPa
           <div class="connection-sub">Self-hosted · Go powered</div>
         </div>
         <div class="sidebar-bottom">
+          <a class="sidebar-project" href="https://github.com/anxuanzi/QuillDNS" target="_blank" rel="noopener noreferrer">
+            <UIcon name="i-lucide-github" class="size-4" />
+            <span>View on GitHub</span>
+            <UIcon name="i-lucide-arrow-up-right" class="size-3" />
+          </a>
           <div class="side-note">DNS, under your control.</div>
-          <div class="side-sub">QuillDNS Open Source</div>
+          <div class="side-sub">Open source · Apache-2.0</div>
         </div>
       </aside>
 
@@ -54,12 +62,23 @@ const views = { overview: OverviewPage, records: RecordsPage, queries: QueriesPa
             <h1 class="h1">{{ current.label }}</h1>
             <p class="subheading">Manage and understand your DNS infrastructure in one place.</p>
           </div>
-          <UBadge color="success" variant="subtle"><UIcon name="i-lucide-shield-check" class="size-4" /> Self-hosted</UBadge>
+          <div class="header-actions">
+            <UBadge color="success" variant="subtle"><UIcon name="i-lucide-shield-check" class="size-4" /> Self-hosted</UBadge>
+            <UButton
+              color="neutral"
+              variant="outline"
+              :icon="mode === 'light' ? 'i-lucide-moon' : 'i-lucide-sun'"
+              :aria-label="mode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'"
+              :title="mode === 'light' ? 'Switch to dark theme' : 'Switch to light theme'"
+              :aria-pressed="mode === 'dark'"
+              @click="toggle"
+            />
+          </div>
         </header>
         <component :is="views[page]" />
         <footer class="footer">
-          <span>QuillDNS · Open-source infrastructure</span>
-          <span>Built for clarity and control</span>
+          <span>© {{ copyrightYear }} QuillDNS contributors · Apache-2.0</span>
+          <a href="https://github.com/anxuanzi/QuillDNS" target="_blank" rel="noopener noreferrer"><UIcon name="i-lucide-github" class="size-4" /> GitHub / anxuanzi/QuillDNS <UIcon name="i-lucide-arrow-up-right" class="size-3" /></a>
         </footer>
       </main>
     </div>

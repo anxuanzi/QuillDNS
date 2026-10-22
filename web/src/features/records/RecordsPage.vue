@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
+import { useQuery, useQueryCache } from '@pinia/colada'
 import { api, type DNSRecord } from '../../lib/api'
 
 type Editable = Omit<DNSRecord, 'id'>
@@ -17,39 +17,57 @@ const records = computed(() => data.value?.data ?? [])
 const filtered = computed(() => records.value.filter(r =>
   (r.name + r.value + r.type).toLowerCase().includes(search.value.toLowerCase())
 ))
-const create = useMutation({
-  mutation: api.createRecord,
-  onSuccess: async () => { pending.value = false; showModal.value = false; notice.value = 'DNS record created'; await queryCache.invalidateQueries({ key: ['records'] }) },
-  onError: e => { pending.value = false; notice.value = e.message }
-})
-const update = useMutation({
-  mutation: (input: { id: string; data: Editable }) => api.updateRecord(input.id, input.data),
-  onSuccess: async () => { pending.value = false; showModal.value = false; notice.value = 'DNS record updated'; await queryCache.invalidateQueries({ key: ['records'] }) },
-  onError: e => { pending.value = false; notice.value = e.message }
-})
-const remove = useMutation({
-  mutation: api.deleteRecord,
-  onSuccess: async () => { notice.value = 'DNS record deleted'; await queryCache.invalidateQueries({ key: ['records'] }) },
-  onError: e => { notice.value = e.message }
-})
 function openCreate() { editID.value = null; form.value = defaultForm(); notice.value = ''; showModal.value = true }
 function openEdit(record: DNSRecord) {
+  if (pending.value) return
   editID.value = record.id
   const { id: _id, ...data } = record
   form.value = { ...defaultForm(), ...data }
   notice.value = ''
   showModal.value = true
 }
-function submit() {
+async function submit() {
   if (pending.value) return
-  notice.value = ''
   pending.value = true
-  const payload = { ...form.value, ttl: Number(form.value.ttl), priority: Number(form.value.priority), weight: Number(form.value.weight), port: Number(form.value.port), flags: Number(form.value.flags ?? 0) }
-  if (editID.value) update.mutate({ id: editID.value, data: payload })
-  else create.mutate(payload)
+  notice.value = ''
+  const payload = {
+    ...form.value,
+    ttl: Number(form.value.ttl),
+    priority: Number(form.value.priority),
+    weight: Number(form.value.weight),
+    port: Number(form.value.port),
+    flags: Number(form.value.flags ?? 0)
+  }
+  try {
+    if (editID.value) {
+      await api.updateRecord(editID.value, payload)
+      notice.value = 'DNS record updated'
+    } else {
+      await api.createRecord(payload)
+      notice.value = 'DNS record created'
+    }
+    showModal.value = false
+    await queryCache.invalidateQueries({ key: ['records'] })
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : 'Unable to save DNS record'
+  } finally {
+    pending.value = false
+  }
 }
-function deleteRecord(record: DNSRecord) {
-  if (window.confirm('Delete ' + record.name + ' (' + record.type + ')?')) remove.mutate(record.id)
+const deletingID = ref<string | null>(null)
+async function deleteRecord(record: DNSRecord) {
+  if (deletingID.value || !window.confirm('Delete ' + record.name + ' (' + record.type + ')?')) return
+  deletingID.value = record.id
+  notice.value = ''
+  try {
+    await api.deleteRecord(record.id)
+    notice.value = 'DNS record deleted'
+    await queryCache.invalidateQueries({ key: ['records'] })
+  } catch (error) {
+    notice.value = error instanceof Error ? error.message : 'Unable to delete record'
+  } finally {
+    deletingID.value = null
+  }
 }
 </script>
 
@@ -77,7 +95,7 @@ function deleteRecord(record: DNSRecord) {
           <td class="muted">{{ record.ttl }}s</td>
           <td><div class="record-actions">
             <UButton color="neutral" variant="ghost" icon="i-lucide-pencil" :aria-label="'Edit ' + record.name" @click="openEdit(record)" />
-            <UButton color="error" variant="ghost" icon="i-lucide-trash-2" :aria-label="'Delete ' + record.name" @click="deleteRecord(record)" />
+            <UButton color="error" variant="ghost" icon="i-lucide-trash-2" :aria-label="'Delete ' + record.name"  :loading="deletingID === record.id" :disabled="deletingID !== null" @click="deleteRecord(record)" />
           </div></td>
         </tr>
         <tr v-if="!filtered.length"><td colspan="5" class="empty-table">
@@ -115,8 +133,8 @@ function deleteRecord(record: DNSRecord) {
     </template>
     <template #footer>
       <div class="modal-actions">
-        <UButton color="neutral" variant="outline" @click="showModal = false">Cancel</UButton>
-        <UButton type="submit" form="record-editor" :loading="pending">{{ editID ? 'Save Changes' : 'Create Record' }}</UButton>
+        <UButton color="neutral" variant="outline" :disabled="pending" @click="showModal = false">Cancel</UButton>
+        <UButton type="submit" form="record-editor" :loading="pending" :disabled="pending">{{ editID ? 'Save Changes' : 'Create Record' }}</UButton>
       </div>
     </template>
   </UModal>
