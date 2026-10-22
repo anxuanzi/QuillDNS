@@ -36,15 +36,18 @@ jobs:
       - name: Smoke-test self-contained container and persisted records
         run: |
           set -euo pipefail
-          docker volume create quilldns-ci-data
+          container_name="quilldns-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          volume_name="quilldns-ci-data-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          docker volume create "$volume_name"
           cleanup() {
-            docker rm -f quilldns-ci >/dev/null 2>&1 || true
-            docker volume rm quilldns-ci-data >/dev/null 2>&1 || true
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+            docker volume rm "$volume_name" >/dev/null 2>&1 || true
           }
           trap cleanup EXIT
           launch() {
-            docker run -d --rm --name quilldns-ci --network host \
-              -v quilldns-ci-data:/data quilldns:ci \
+            docker rm -f "$container_name" >/dev/null 2>&1 || true
+            docker run -d --name "$container_name" --network host \
+              -v "$volume_name":/data quilldns:ci \
               -data /data/quilldns.db \
               -dns 127.0.0.1:11053 \
               -http 127.0.0.1:18080 >/dev/null
@@ -56,7 +59,7 @@ jobs:
               fi
               sleep 1
             done
-            docker logs quilldns-ci
+            docker logs "$container_name"
             return 1
           }
           launch
@@ -65,7 +68,7 @@ jobs:
           curl -fsS -X POST http://127.0.0.1:18080/api/v1/records \
             -H 'Content-Type: application/json' \
             -d '{"name":"smoke.test","type":"A","value":"10.0.0.20","ttl":60}' >/dev/null
-          docker stop quilldns-ci >/dev/null
+          docker rm -f "$container_name" >/dev/null
           launch
           ready
           curl -fsS http://127.0.0.1:18080/api/v1/records | grep -q 'smoke.test.'
