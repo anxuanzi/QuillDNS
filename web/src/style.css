@@ -185,3 +185,39 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--qd-accent); out
   .metric-mini-value { font-size:15px; }
   .footer { flex-direction:column; align-items:flex-start; }
 }
+
+/* Interaction affordances apply to Nuxt UI primitives, popovers and native controls.
+   Never show a hand cursor on disabled actions. */
+:where(
+  a[href],
+  button:not(:disabled):not([aria-disabled="true"]),
+  [role="button"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="option"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitem"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="menuitemcheckbox"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="radio"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="switch"]:not([aria-disabled="true"]):not([data-disabled]),
+  [role="tab"]:not([aria-disabled="true"]):not([data-disabled]),
+  summary,
+  select:not(:disabled),
+  label[for],
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled)
+) { cursor: pointer; }
+:where(
+  button:disabled,
+  select:disabled,
+  [aria-disabled="true"],
+  [data-disabled],
+  input[type="checkbox"]:disabled,
+  input[type="radio"]:disabled
+) { cursor: not-allowed; }
+
+.chart-frame {
+  height: 235px;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  contain: layout paint;
+}
+.chart-frame > * { max-width: 100%; }
