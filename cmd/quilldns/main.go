@@ -19,6 +19,7 @@ import (
 	"github.com/anxuanzi/QuillDNS/internal/httpapi"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
 	"github.com/anxuanzi/QuillDNS/internal/records"
+ "github.com/anxuanzi/QuillDNS/internal/settings"
 	"github.com/anxuanzi/QuillDNS/webassets"
 	"github.com/miekg/dns"
 )
@@ -53,7 +54,13 @@ func main() {
 		slog.Error("open telemetry", "error", err)
 		os.Exit(1)
 	}
-	server := dnsserver.New(store, telemetry, strings.Split(upstream, ","))
+	resolverSettings,err:=settings.Open(data)
+ if err!=nil{slog.Error("open settings","error",err);os.Exit(1)}
+ defer resolverSettings.Close()
+ addresses,err:=resolverSettings.Upstreams(strings.Split(upstream,","))
+ if err!=nil{slog.Error("invalid persisted upstream configuration","error",err);os.Exit(1)}
+ server := dnsserver.New(store, telemetry, addresses)
+ if err=server.SetUpstreams(addresses);err!=nil{slog.Error("invalid resolver upstreams","error",err);os.Exit(1)}
 	if err := server.SetAllowedNetworks(allowed); err != nil {
 		slog.Error("invalid client access policy", "error", err)
 		os.Exit(1)
@@ -66,7 +73,7 @@ func main() {
 	go func() { errch <- udp.ListenAndServe() }()
 	go func() { errch <- tcp.ListenAndServe() }()
 
-	api := (&httpapi.API{Records: store, DNS: server, Telemetry: telemetry}).Handler()
+	api := (&httpapi.API{Records: store, DNS: server, Telemetry: telemetry, Settings: resolverSettings}).Handler()
 	var oidcManager *auth.Manager
 	oidcSettings := auth.Config{
 		Issuer:        os.Getenv("QUILLDNS_OIDC_ISSUER"),
