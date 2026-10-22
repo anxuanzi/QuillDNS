@@ -1,9 +1,14 @@
 # DNS resolution domain
 
-Go DNS server using `miekg/dns` for UDP/TCP. Algorithm: local exact RRset (or CNAME) → positive response cache → ordered public upstream fallback. Replies identify local/cache/upstream origins for integrated observability.
+The Go DNS server uses `miekg/dns` for UDP/TCP and an in-memory RRset index. Resolution: local exact override/CNAME → bounded positive cache → ordered public DNS upstreams. The query handler never uses SQL or filesystem I/O.
 
-## Limits of this foundation
-- Upstreams are plain DNS UDP/TCP; DoH/DoT, health scoring, and encrypted transport are future work.
-- Positive cache is bounded and only used for queries without EDNS and CD; negative caching is not implemented.
-- DNSSEC-validating semantics, full CNAME synthesis, wildcard policies, client access rules, and robust truncation across all edge cases require further implementation/testing before internet-facing operation.
-- Use only on a trusted private network in this initial release.
+## Access restrictions
+All DNS clients are denied unless their IP address is in `--allow-networks`. Defaults are `127.0.0.0/8,::1/128`. Change both the DNS bind address and the CIDRs for private infrastructure use. Do not allow `0.0.0.0/0` or `::/0` on a publicly reachable endpoint.
+
+## DNS behavior and remaining limitations
+- Incoming UDP and TCP supported; truncated upstream UDP queries retry with TCP.
+- Only plain UDP/TCP upstreams are available. Health-aware upstream scoring, DoT, DoH and DoQ remain future work.
+- Locally synthetic answers are not marked DNSSEC authenticated.
+- EDNS and DNSSEC-sensitive upstream requests bypass the basic positive cache.
+- TTL-aware positive cache is bounded. Negative caching is not yet supported.
+- Wildcards, DNSSEC policy, detailed CNAME resolution, retry classification and additional RFC edge cases need further integration tests.

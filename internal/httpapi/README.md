@@ -1,13 +1,15 @@
-# Management API
+# HTTP management API
 
-HTTP transport and request validation. The API orchestrates record persistence and DNS testing but does not implement record semantics.
+The API owns request orchestration and error translation but delegates DNS rules to the Records and DNS domains.
 
-## Routes
+## Endpoints
 - `GET /api/v1/health`
 - `GET, POST /api/v1/records`
-- `DELETE /api/v1/records/{id}`
-- `GET /api/v1/queries`
-- `GET /api/v1/metrics/summary`
-- `POST /api/v1/dns/resolve`
+- `PUT, DELETE /api/v1/records/{id}`
+- `GET /api/v1/queries` — recent persistent history where configured
+- `GET /api/v1/metrics/summary` — built-in runtime counters
+- `POST /api/v1/dns/resolve` — in-process DNS test
 
-JSON responses are intentionally small and versioned. No unauthenticated remote management is safe: the default HTTP listen address is loopback. OIDC is planned, **not implemented**. Restrict access with SSH forwarding or private network boundaries until authentication ships.
+No external services are required. Record IDs are generated with cryptographic randomness. Request JSON has strict unknown-field and trailing-content checks. Basic same-origin and browser framing restrictions are enforced.
+
+**OIDC is not yet implemented.** The HTTP management service refuses non-loopback binding until a proper authentication flow exists.
