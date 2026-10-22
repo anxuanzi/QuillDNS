@@ -45,7 +45,7 @@ jobs:
           }
           trap cleanup EXIT
           launch() {
-            docker run -d --name quilldns-ci --network host \
+            docker run -d --rm --name quilldns-ci --network host \
               -v quilldns-ci-data:/data quilldns:ci \
               -data /data/quilldns.db \
               -dns 127.0.0.1:11053 \
