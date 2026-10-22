@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"log/slog"
 	"net"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/anxuanzi/QuillDNS/internal/auth"
+	"github.com/anxuanzi/QuillDNS/internal/config"
 	"github.com/anxuanzi/QuillDNS/internal/dnsserver"
 	"github.com/anxuanzi/QuillDNS/internal/httpapi"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
@@ -25,13 +25,12 @@ import (
 )
 
 func main() {
-	var data, listen, dnsListen, upstream, allowed string
-	flag.StringVar(&data, "data", "./data/quilldns.db", "SQLite record configuration database")
-	flag.StringVar(&listen, "http", httpapi.ListenAddress(), "management bind address; unauthenticated mode is loopback-only")
-	flag.StringVar(&dnsListen, "dns", "127.0.0.1:1053", "DNS listener (UDP and TCP)")
-	flag.StringVar(&upstream, "upstreams", "1.1.1.1:53,8.8.8.8:53", "comma-separated DNS upstreams")
-	flag.StringVar(&allowed, "allow-networks", "127.0.0.0/8,::1/128", "comma-separated client CIDRs allowed to query DNS")
-	flag.Parse()
+	cfg, err := config.Parse(os.Args[1:], os.LookupEnv)
+	if err != nil {
+		slog.Error("invalid QuillDNS configuration", "error", err)
+		os.Exit(2)
+	}
+	data, listen, dnsListen, upstream, allowed := cfg.DataPath, cfg.HTTPListen, cfg.DNSListen, cfg.Upstreams, cfg.AllowNetworks
 
 	host, _, err := net.SplitHostPort(listen)
 	if err != nil {
