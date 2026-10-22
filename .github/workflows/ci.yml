@@ -11,29 +11,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version-file: go.mod
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Build frontend
-        run: npm install --prefix web && npm run build --prefix web
-      - name: Go formatting
-        run: gofmt -w cmd internal webassets
-      - name: Verify Go module metadata
-        run: go mod tidy
-      - name: Test Go with race detector
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install locked frontend dependencies
+        run: npm ci --prefix web --no-audit
+      - name: Build embedded SPA
+        run: npm run build --prefix web
+      - name: Check Go formatting
+        run: test -z "$(gofmt -l cmd internal webassets)"
+      - name: Go tests and race detection
         run: go test -race ./...
-      - name: Vet Go
+      - name: Go static analysis
         run: go vet ./...
-      - name: Export normalized files for source control
+      - name: Check module metadata
         run: |
-          find cmd internal webassets -type f -name '*.go' | sort | while read -r f; do
-            echo "QUILL_SOURCE_BEGIN:$f"
-            base64 "$f"
-            echo "QUILL_SOURCE_END"
-          done
-          for f in go.mod go.sum web/package-lock.json; do
-            echo "QUILL_SOURCE_BEGIN:$f"
-            base64 "$f"
-            echo "QUILL_SOURCE_END"
-          done
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Build production Go binary
+        run: CGO_ENABLED=0 go build -trimpath -o quilldns ./cmd/quilldns
+      - name: Build container image
+        run: docker build -f deploy/Dockerfile -t quilldns:ci .

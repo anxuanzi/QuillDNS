@@ -16,7 +16,7 @@ import (
 	"github.com/anxuanzi/QuillDNS/internal/dnsserver"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
 	"github.com/anxuanzi/QuillDNS/internal/records"
- "github.com/anxuanzi/QuillDNS/internal/settings"
+	"github.com/anxuanzi/QuillDNS/internal/settings"
 	"github.com/miekg/dns"
 )
 
@@ -24,7 +24,7 @@ type API struct {
 	Records   *records.Store
 	DNS       *dnsserver.Server
 	Telemetry *observability.Collector
- Settings *settings.Store
+	Settings  *settings.Store
 }
 
 func (a *API) Handler() http.Handler {
@@ -48,8 +48,8 @@ func (a *API) Handler() http.Handler {
 		respond(w, 200, map[string]any{"data": data})
 	})
 	mux.HandleFunc("POST /api/v1/dns/resolve", a.lookup)
- mux.HandleFunc("GET /api/v1/upstreams",a.getUpstreams)
- mux.HandleFunc("PUT /api/v1/upstreams",a.putUpstreams)
+	mux.HandleFunc("GET /api/v1/upstreams", a.getUpstreams)
+	mux.HandleFunc("PUT /api/v1/upstreams", a.putUpstreams)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
@@ -201,16 +201,32 @@ func ListenAddress() string { return net.JoinHostPort("127.0.0.1", "8080") }
 
 var _ = fmt.Sprintf
 
-func(a *API)getUpstreams(w http.ResponseWriter,r *http.Request){
- respond(w,200,map[string]any{"data":a.DNS.UpstreamAddresses()})
+func (a *API) getUpstreams(w http.ResponseWriter, r *http.Request) {
+	respond(w, 200, map[string]any{"data": a.DNS.UpstreamAddresses()})
 }
-func(a *API)putUpstreams(w http.ResponseWriter,r *http.Request){
- if a.Settings==nil{problem(w,503,"upstream configuration unavailable");return}
- var req struct{Addresses []string `json:"addresses"`}
- if !decode(w,r,&req){return}
- normalized,err:=settings.ValidateUpstreams(req.Addresses)
- if err!=nil{problem(w,400,err.Error());return}
- if err=a.Settings.SaveUpstreams(normalized);err!=nil{problem(w,500,"could not persist upstreams");return}
- if err=a.DNS.SetUpstreams(normalized);err!=nil{problem(w,500,"could not apply upstreams");return}
- respond(w,200,map[string]any{"data":normalized})
+func (a *API) putUpstreams(w http.ResponseWriter, r *http.Request) {
+	if a.Settings == nil {
+		problem(w, 503, "upstream configuration unavailable")
+		return
+	}
+	var req struct {
+		Addresses []string `json:"addresses"`
+	}
+	if !decode(w, r, &req) {
+		return
+	}
+	normalized, err := settings.ValidateUpstreams(req.Addresses)
+	if err != nil {
+		problem(w, 400, err.Error())
+		return
+	}
+	if err = a.Settings.SaveUpstreams(normalized); err != nil {
+		problem(w, 500, "could not persist upstreams")
+		return
+	}
+	if err = a.DNS.SetUpstreams(normalized); err != nil {
+		problem(w, 500, "could not apply upstreams")
+		return
+	}
+	respond(w, 200, map[string]any{"data": normalized})
 }

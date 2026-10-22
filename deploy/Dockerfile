@@ -2,7 +2,7 @@
 FROM node:22-alpine AS frontend
 WORKDIR /workspace/web
 COPY web/package*.json ./
-RUN npm install --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY web/ ./
 RUN npm run build
 
@@ -12,10 +12,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend /workspace/webassets/dist/ ./webassets/dist/
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /quilldns ./cmd/quilldns
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /quilldns ./cmd/quilldns && mkdir -p /image-data && chmod 0700 /image-data
 
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=builder /quilldns /quilldns
+COPY --chown=nonroot:nonroot --from=builder /image-data /data
 WORKDIR /data
 USER nonroot:nonroot
 VOLUME ["/data"]
