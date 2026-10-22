@@ -111,7 +111,6 @@ jobs:
       - name: Require version tags to originate from main
         if: startsWith(github.ref, 'refs/tags/v')
         run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Extract image tags and labels
         id: meta

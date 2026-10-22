@@ -1,19 +1,21 @@
 # syntax=docker/dockerfile:1
 # Build the Vue 3 SPA with Bun, then embed it into the Go executable.
-FROM oven/bun:1.3.5-alpine AS frontend
+FROM --platform=$BUILDPLATFORM oven/bun:1.3.5-alpine AS frontend
 WORKDIR /workspace/web
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
 COPY web/ ./
 RUN bun run build
 
-FROM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+ARG TARGETOS
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend /workspace/webassets/dist/ ./webassets/dist/
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /quilldns ./cmd/quilldns \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /quilldns ./cmd/quilldns \
     && mkdir -p /image-data && chmod 0700 /image-data
 
 # Non-root, no runtime shell, no Bun/Node installation, no external services.

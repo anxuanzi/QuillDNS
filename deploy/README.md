@@ -93,3 +93,7 @@ CI builds and tests the Go binary, embedded Vue UI, Docker runtime and live brow
 | `v1.2.3-rc.1` | `1.2.3-rc.1`, `sha-<full commit SHA>` (no `latest`) |
 
 Architectures: `linux/amd64` and `linux/arm64`. A GitHub package's public visibility is a package-owner setting; package publishing cannot guarantee that anonymous pulls are enabled. This is an infrastructure packaging feature, not a claim that QuillDNS has completed every production-readiness gate.
+
+### Cross-platform build details
+
+The Dockerfile runs Bun and the Go compiler on the native Buildx **build platform**, then cross-compiles the CGO-free Go binary for each **target platform**. The same workflow publishes Linux AMD64 and ARM64 images without executing build tools under QEMU. The OCI manifest is inspected after pushing.
