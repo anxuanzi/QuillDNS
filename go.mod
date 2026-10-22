@@ -4,7 +4,10 @@ go 1.23.0
 
 toolchain go1.23.12
 
-require github.com/miekg/dns v1.1.68
+require (
+ github.com/miekg/dns v1.1.68
+ modernc.org/sqlite v1.34.5
+)
 
 require (
 	golang.org/x/mod v0.24.0 // indirect
