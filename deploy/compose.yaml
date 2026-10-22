@@ -1,0 +1,25 @@
+# Local/trusted Linux host deployment. Enable OIDC before exposing management remotely.
+services:
+  quilldns:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    command:
+      - -data
+      - /data/quilldns.db
+      - -dns
+      - "127.0.0.1:1053"
+      - -http
+      - "127.0.0.1:8080"
+      - -allow-networks
+      - "127.0.0.0/8,::1/128"
+    volumes:
+      - quilldns_data:/data
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+
+volumes:
+  quilldns_data:

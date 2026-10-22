@@ -14,6 +14,7 @@ import (
  "syscall"
  "time"
 
+ "github.com/anxuanzi/QuillDNS/internal/auth"
  "github.com/anxuanzi/QuillDNS/internal/dnsserver"
  "github.com/anxuanzi/QuillDNS/internal/httpapi"
  "github.com/anxuanzi/QuillDNS/internal/observability"
@@ -32,7 +33,7 @@ func main(){
 
  host,_,err:=net.SplitHostPort(listen)
  if err!=nil{slog.Error("invalid management listener","error",err);os.Exit(1)}
- if host!="localhost"&&host!="127.0.0.1"&&host!="::1"{
+ if os.Getenv("QUILLDNS_OIDC_ISSUER")=="" && host!="localhost"&&host!="127.0.0.1"&&host!="::1"{
   slog.Error("unauthenticated management UI must bind to loopback")
   os.Exit(1)
  }
@@ -53,10 +54,35 @@ func main(){
  go func(){errch<-tcp.ListenAndServe()}()
 
  api:=(&httpapi.API{Records:store,DNS:server,Telemetry:telemetry}).Handler()
+ var oidcManager *auth.Manager
+ oidcSettings:=auth.Config{
+  Issuer:os.Getenv("QUILLDNS_OIDC_ISSUER"),
+  ClientID:os.Getenv("QUILLDNS_OIDC_CLIENT_ID"),
+  ClientSecret:os.Getenv("QUILLDNS_OIDC_CLIENT_SECRET"),
+  PublicURL:os.Getenv("QUILLDNS_PUBLIC_URL"),
+  AllowedEmails:strings.Split(os.Getenv("QUILLDNS_OIDC_ALLOWED_EMAILS"),","),
+ }
+ if oidcSettings.Issuer!=""||oidcSettings.ClientID!=""||oidcSettings.ClientSecret!=""||oidcSettings.PublicURL!=""{
+  ctx,cancel:=context.WithTimeout(context.Background(),15*time.Second)
+  oidcManager,err=auth.New(ctx,oidcSettings)
+  cancel()
+  if err!=nil{slog.Error("initialize OIDC","error",err);os.Exit(1)}
+ }
  mux:=http.NewServeMux()
  mux.Handle("/api/",api)
  mux.Handle("/",webassets.Handler())
- httpServer:=&http.Server{Addr:listen,Handler:mux,ReadHeaderTimeout:5*time.Second,ReadTimeout:15*time.Second,WriteTimeout:30*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<20}
+ if oidcManager!=nil{
+  oidcManager.Routes(mux)
+ }else{
+  mux.HandleFunc("GET /api/v1/session",func(w http.ResponseWriter,r *http.Request){
+   w.Header().Set("Content-Type","application/json")
+   w.Header().Set("Cache-Control","no-store")
+   _,_=w.Write([]byte(`{"mode":"disabled","authenticated":false}`))
+  })
+ }
+ var handler http.Handler=mux
+ if oidcManager!=nil{handler=oidcManager.Guard(mux)}
+ httpServer:=&http.Server{Addr:listen,Handler:handler,ReadHeaderTimeout:5*time.Second,ReadTimeout:15*time.Second,WriteTimeout:30*time.Second,IdleTimeout:60*time.Second,MaxHeaderBytes:1<<20}
  go func(){errch<-httpServer.ListenAndServe()}()
  slog.Info("QuillDNS started","dns",dnsListen,"http",listen,"allowed_networks",allowed)
  ctx,stop:=signal.NotifyContext(context.Background(),syscall.SIGTERM,os.Interrupt)

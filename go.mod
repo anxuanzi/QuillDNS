@@ -7,6 +7,8 @@ toolchain go1.23.12
 require (
  github.com/miekg/dns v1.1.68
  modernc.org/sqlite v1.34.5
+ github.com/coreos/go-oidc/v3 v3.12.0
+ golang.org/x/oauth2 v0.27.0
 )
 
 require (

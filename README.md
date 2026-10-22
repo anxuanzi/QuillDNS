@@ -2,55 +2,89 @@
 
 **DNS, under your control.**
 
-QuillDNS is an open-source, self-hosted Go DNS proxy with local record overrides, public DNS forwarding, a responsive Vue 3 management interface, and first-party observability. This repository currently contains an **early development foundation**, not a production release.
+QuillDNS is a lightweight, open-source Go DNS override proxy with a self-contained Vue 3 management SPA. Local records take precedence over public DNS, and unmatched name/type lookups use configurable public upstream resolvers. It includes an in-process TTL-aware response cache, transactional embedded SQLite record storage, optional OpenID Connect sign-in, and first-party query analytics. **Pre-release: not yet certified for exposed production networks.**
 
-## Architecture
+## Features
 
-- **DNS** — `miekg/dns` UDP/TCP server; exact local RRsets, positive cache, ordered upstream fallback.
-- **Records** — validated A, AAAA, CNAME, TXT, MX, SRV and PTR records; immutable in-memory snapshots; embedded JSON persistence.
-- **API** — Go `net/http` management endpoints with no mandatory service dependency.
-- **Observability** — integrated in-memory query history and counters, not Prometheus or Grafana.
-- **UI** — Vue 3 + Vite + Nuxt UI + Pinia + Pinia Colada; compiled into Go via `go:embed`.
+- DNS over UDP and TCP with local-first A, AAAA, CNAME, TXT, MX, SRV and PTR responses.
+- Type-specific fallback to DNS upstreams, ordered failover and UDP→TCP retries for truncated replies.
+- Strict DNS client CIDR policy; default loopback-only DNS and management listeners.
+- Built-in query event collection, durable seven-day SQLite query history, runtime counters and drop metrics.
+- Embedded Vue 3 SPA built using Vite, Nuxt UI, Pinia and Pinia Colada.
+- Optional OIDC (authorization code + PKCE), protected HTTP-only sessions and email allowlist.
+- Embedded SQLite persistence; no Redis, PostgreSQL, Prometheus, Grafana, or other required daemon.
 
-Documentation: [DNS](internal/dnsserver/README.md), [Records](internal/records/README.md), [HTTP API](internal/httpapi/README.md), [Observability](internal/observability/README.md), [Frontend](web/README.md), [Architecture](docs/architecture.md).
+## Quick start (developer)
 
-## Development
+Prerequisites: Go 1.23+, Node.js 22.12+, npm.
 
-Prerequisites: Go 1.23+, Node.js 22.12+ (or Node 20.19+), npm.
-
-```bash
-cd web
-npm install
-npm run build
-cd ..
-go mod tidy
-go test ./...
+```sh
+npm install --prefix web
+npm run build --prefix web
+go mod download
+go test -race ./...
 go run ./cmd/quilldns
 ```
 
-The API and embedded UI default to `http://127.0.0.1:8080`. DNS defaults to `127.0.0.1:1053` on both UDP and TCP, avoiding privileged ports during development.
+Open http://127.0.0.1:8080; DNS listens on port 1053 over UDP and TCP on loopback.
 
-```bash
-dig @127.0.0.1 -p 1053 example.org A
-curl http://127.0.0.1:8080/api/v1/health
-```
-
-Production builds **must** compile the frontend first. A placeholder embedded index exists to keep backend tests buildable without Node dependencies.
-
-## Example API
-
-```bash
-curl -X POST http://127.0.0.1:8080/api/v1/records \
+```sh
+curl -s http://127.0.0.1:8080/api/v1/health
+curl -s -X POST http://127.0.0.1:8080/api/v1/records \
   -H 'Content-Type: application/json' \
-  -d '{"name":"api.internal.test","type":"A","value":"10.0.0.20","ttl":300}'
-
+  --data '{"name":"api.internal.test","type":"A","value":"10.0.0.20","ttl":60}'
 dig @127.0.0.1 -p 1053 api.internal.test A
 ```
 
-## Security and release status
+## Running as a DNS resolver
 
-**Do not deploy this foundation as an unrestricted public resolver.** OIDC is not implemented; management binds to loopback by default, DNS also binds to loopback, and client access control is not implemented. Use this version only for local development or within secured environments.
+By default QuillDNS binds only to loopback: this is deliberate because open recursive resolvers are frequently abused. To serve a trusted subnet, bind DNS to a private address and explicitly specify accepted clients:
 
-Further work includes OIDC, persistent query history, comprehensive protocol tests, EDNS/DNSSEC semantics, wildcard overrides, encrypted upstreams, health-aware upstream failover, query-cache hardening, and end-to-end browser tests. See [architecture and roadmap](docs/architecture.md).
+```sh
+./quilldns -dns 192.168.10.10:53 -allow-networks 192.168.10.0/24,127.0.0.0/8,::1/128
+```
 
-Licensed under Apache-2.0.
+Do not expose unrestricted public DNS recursion. Set firewall rules too. A zero-trust network configuration and DNSSEC correctness review are still required before critical production use.
+
+## Authentication
+
+When OIDC is not configured, the management UI has **no authentication** and binds exclusively to loopback. For remote management, configure an OIDC provider, a public HTTPS URL, and a reverse proxy with TLS:
+
+```sh
+export QUILLDNS_OIDC_ISSUER='https://id.example.com/realms/home'
+export QUILLDNS_OIDC_CLIENT_ID='quilldns'
+export QUILLDNS_OIDC_CLIENT_SECRET='your-secret-from-a-secure-store'
+export QUILLDNS_PUBLIC_URL='https://dns.example.com'
+export QUILLDNS_OIDC_ALLOWED_EMAILS='admin@example.com'
+./quilldns -http 0.0.0.0:8080
+```
+
+Register `https://dns.example.com/auth/callback` as your provider's redirect URI. The proxy must preserve the public `Host` and enforce TLS. Empty allowed-email list admits any identity accepted by the configured provider, so set an allowlist for shared identity providers. All OIDC settings must be present together; partial configuration fails startup.
+
+## Build a single release binary
+
+```sh
+npm install --prefix web
+npm run build --prefix web
+CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o quilldns ./cmd/quilldns
+```
+
+The Go `webassets` package embeds `webassets/dist` via `go:embed`. **Always build the frontend before building the release binary.** Without it, a placeholder development index may be embedded.
+
+## Repository layout
+
+| Domain | Documentation |
+|---|---|
+| DNS and caching | [internal/dnsserver/README.md](internal/dnsserver/README.md) |
+| Record management | [internal/records/README.md](internal/records/README.md) |
+| HTTP management API | [internal/httpapi/README.md](internal/httpapi/README.md) |
+| OIDC authentication | [internal/auth/README.md](internal/auth/README.md) |
+| Built-in observability | [internal/observability/README.md](internal/observability/README.md) |
+| Vue SPA | [web/README.md](web/README.md) |
+| Design decisions and roadmap | [docs/architecture.md](docs/architecture.md) |
+
+## Release maturity
+
+The current implementation is an actively tested foundation, **not a final production release**. Remaining high-priority verification includes DNS fuzzing, full protocol/EDNS/DNSSEC handling, session/redirect security review, configuration migration, upstream health/failover tests, E2E browser tests, backups and restore drills, and reproducible release artifacts. See [architecture](docs/architecture.md).
+
+Apache-2.0 licensed.

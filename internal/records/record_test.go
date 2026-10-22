@@ -25,7 +25,9 @@ func TestValidate(t *testing.T) {
 	}
 }
 func TestStoreLocalAndFallback(t *testing.T) {
-	s, e := Open(filepath.Join(t.TempDir(), "records.json"))
+	path := filepath.Join(t.TempDir(), "records.sqlite")
+ s, e := Open(path)
+ defer s.Close()
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -40,11 +42,12 @@ func TestStoreLocalAndFallback(t *testing.T) {
 	if _, ok = s.Lookup("api.example.com", dns.TypeTXT); ok {
 		t.Fatal("TXT must fall through")
 	}
-	s2, e := Open(filepath.Join(filepath.Dir(s.path), "records.json"))
+	s2, e := Open(path)
 	if e != nil {
 		t.Fatal(e)
 	}
-	if _, ok = s2.Lookup("api.example.com", dns.TypeA); !ok {
+	defer s2.Close()
+ if _, ok = s2.Lookup("api.example.com", dns.TypeA); !ok {
 		t.Fatal("persistence failed")
 	}
 	if e = s2.Delete("1"); e != nil {
