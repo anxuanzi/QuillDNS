@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useQuery, useMutation, useQueryCache } from '@pinia/colada'
 import { api, type DNSRecord } from './lib/api'
 
@@ -13,8 +13,15 @@ const tabs: { key: Page, label: string, icon: string }[] = [
 ]
 const queryCache = useQueryCache()
 const { data: recordsResponse, status: recordsStatus, error: recordsError } = useQuery({ key: ['records'], query: api.records })
-const { data: metrics } = useQuery({ key: ['metrics'], query: api.metrics, refetchInterval: 5000 })
-const { data: queryResponse } = useQuery({ key: ['queries'], query: api.queries, refetchInterval: 5000 })
+const { data: metrics } = useQuery({ key: ['metrics'], query: api.metrics })
+const { data: queryResponse } = useQuery({ key: ['queries'], query: api.queries })
+const { refetch: refetchMetrics } = useQuery({ key: ['metrics'], query: api.metrics })
+const { refetch: refetchQueries } = useQuery({ key: ['queries'], query: api.queries })
+let polling: ReturnType<typeof setInterval> | undefined
+onMounted(() => {
+  polling = setInterval(() => { void refetchMetrics(); void refetchQueries() }, 5000)
+})
+onUnmounted(() => { if (polling) clearInterval(polling) })
 const records = computed(() => recordsResponse.value?.data ?? [])
 const queries = computed(() => queryResponse.value?.data ?? [])
 const search = ref('')

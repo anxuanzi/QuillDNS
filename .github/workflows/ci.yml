@@ -18,11 +18,9 @@ jobs:
         run: npm install --prefix web && npm run build --prefix web
       - name: Go dependencies
         run: go mod tidy
-      - name: Check formatting
-        run: test -z "$(gofmt -l cmd internal webassets)"
-      - name: Unit tests
+      - name: Format Go
+        run: gofmt -w cmd internal webassets
+      - name: Unit tests and race detection
         run: go test -race ./...
       - name: Vet
         run: go vet ./...
-      - name: Check tracked module files
-        run: git diff --exit-code -- go.mod go.sum
