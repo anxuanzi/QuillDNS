@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryCache } from '@pinia/colada'
 import { api, type DNSRecord } from '../../lib/api'
 
 type Editable = Omit<DNSRecord, 'id'>
-const defaultForm = (): Editable => ({ name: '', type: 'A', value: '', ttl: 300, enabled: true, priority: 10, weight: 0, port: 443 })
+const defaultForm = (): Editable => ({ name: '', type: 'A', value: '', ttl: 300, enabled: true, priority: 10, weight: 0, port: 443, flags: 0, tag: "issue" })
 const form = ref<Editable>(defaultForm())
 const editID = ref<string | null>(null)
 const showModal = ref(false)
@@ -41,7 +41,7 @@ function openEdit(record: DNSRecord) {
 }
 function submit() {
   notice.value = ''
-  const payload = { ...form.value, ttl: Number(form.value.ttl), priority: Number(form.value.priority), weight: Number(form.value.weight), port: Number(form.value.port) }
+  const payload = { ...form.value, ttl: Number(form.value.ttl), priority: Number(form.value.priority), weight: Number(form.value.weight), port: Number(form.value.port), flags: Number(form.value.flags ?? 0) }
   if (editID.value) update.mutate({ id: editID.value, data: payload })
   else create.mutate(payload)
 }
@@ -91,13 +91,17 @@ const pending = computed(() => create.status.value === 'pending' || update.statu
       <form id="record-editor" class="editor-form" @submit.prevent="submit">
         <div><label class="field-label" for="record-name">Hostname</label><UInput id="record-name" v-model="form.name" placeholder="api.internal.example" class="w-full" required /></div>
         <div class="grid2">
-          <div><label class="field-label">Record type</label><USelect v-model="form.type" :items="['A','AAAA','CNAME','TXT','MX','SRV','PTR']" class="w-full" /></div>
+          <div><label class="field-label">Record type</label><USelect v-model="form.type" :items="['A','AAAA','CNAME','TXT','MX','SRV','PTR','CAA']" class="w-full" /></div>
           <div><label class="field-label" for="record-ttl">TTL (seconds)</label><UInput id="record-ttl" v-model.number="form.ttl" type="number" min="1" max="86400" class="w-full" /></div>
         </div>
         <div>
-          <label class="field-label" for="record-value">{{ form.type === 'TXT' ? 'Text value' : ['A','AAAA'].includes(form.type) ? 'IP address' : 'Target hostname' }}</label>
+          <label class="field-label" for="record-value">{{ form.type === 'TXT' ? 'Text value' : form.type === 'CAA' ? 'Issuer or policy value' : ['A','AAAA'].includes(form.type) ? 'IP address' : 'Target hostname' }}</label>
           <UTextarea v-if="form.type === 'TXT'" id="record-value" v-model="form.value" class="w-full" />
           <UInput v-else id="record-value" v-model="form.value" class="w-full" required :placeholder="form.type === 'A' ? '10.0.0.20' : form.type === 'AAAA' ? '2001:db8::20' : 'target.example.com'" />
+        </div>
+        <div v-if="form.type === 'CAA'" class="grid2">
+          <div><label class="field-label" for="caa-tag">CAA property tag</label><USelect id="caa-tag" v-model="form.tag" :items="['issue','issuewild','iodef']" class="w-full" /></div>
+          <div><label class="field-label" for="caa-flags">CAA flags</label><UInput id="caa-flags" v-model.number="form.flags" type="number" min="0" max="255" class="w-full" /></div>
         </div>
         <div v-if="form.type === 'MX' || form.type === 'SRV'" class="grid2">
           <div><label class="field-label">Priority</label><UInput v-model.number="form.priority" type="number" min="0" max="65535" class="w-full" /></div>

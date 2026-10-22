@@ -20,6 +20,8 @@ type Record struct {
 	Priority uint16 `json:"priority,omitempty"`
 	Weight   uint16 `json:"weight,omitempty"`
 	Port     uint16 `json:"port,omitempty"`
+	Flags    uint8  `json:"flags,omitempty"`
+	Tag      string `json:"tag,omitempty"`
 	Enabled  bool   `json:"enabled"`
 }
 
@@ -70,6 +72,19 @@ func (r *Record) Validate() error {
 			return fmt.Errorf("invalid target: %w", e)
 		}
 		r.Value = v
+	case "CAA":
+		r.Tag = strings.ToLower(strings.TrimSpace(r.Tag))
+		if r.Tag == "" || len(r.Tag) > 15 {
+			return errors.New("CAA tag must contain 1-15 alphanumeric characters")
+		}
+		for _, char := range r.Tag {
+			if !((char >= 'a' && char <= 'z') || (char >= '0' && char <= '9')) {
+				return errors.New("CAA tag may only contain ASCII letters and digits")
+			}
+		}
+		if len(r.Value) > 255 || strings.ContainsAny(r.Value, "\r\n") {
+			return errors.New("CAA value is invalid or exceeds 255 bytes")
+		}
 	case "TXT":
 		if len(r.Value) > 4096 {
 			return errors.New("TXT text exceeds 4096 bytes")
@@ -99,6 +114,8 @@ func (r Record) RR() (dns.RR, error) {
 		return &dns.PTR{Hdr: h, Ptr: r.Value}, nil
 	case "TXT":
 		return &dns.TXT{Hdr: h, Txt: splitTXT(r.Value)}, nil
+	case "CAA":
+		return &dns.CAA{Hdr: h, Flag: r.Flags, Tag: r.Tag, Value: r.Value}, nil
 	case "MX":
 		return &dns.MX{Hdr: h, Preference: r.Priority, Mx: r.Value}, nil
 	case "SRV":

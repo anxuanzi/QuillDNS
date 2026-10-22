@@ -6,7 +6,7 @@ QuillDNS is a lightweight, open-source Go DNS override proxy with a self-contain
 
 ## Features
 
-- DNS over UDP and TCP with local-first A, AAAA, CNAME, TXT, MX, SRV and PTR responses.
+- DNS over UDP and TCP with local-first A, AAAA, CNAME, TXT, MX, SRV, PTR and CAA responses.
 - Type-specific fallback to DNS upstreams, ordered failover and UDP→TCP retries for truncated replies.
 - Strict DNS client CIDR policy; default loopback-only DNS and management listeners.
 - Built-in query event collection, durable seven-day SQLite query history, runtime counters and drop metrics.

@@ -1,13 +1,15 @@
 export interface DNSRecord {
   id: string
   name: string
-  type: 'A' | 'AAAA' | 'TXT' | 'CNAME' | 'MX' | 'SRV' | 'PTR'
+  type: 'A' | 'AAAA' | 'TXT' | 'CNAME' | 'MX' | 'SRV' | 'PTR' | 'CAA'
   value: string
   ttl: number
   enabled: boolean
   priority?: number
   weight?: number
   port?: number
+  flags?: number
+  tag?: string
 }
 export interface QueryEvent {
   time: string
