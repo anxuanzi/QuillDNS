@@ -12,15 +12,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: web/package-lock.json
+          bun-version: '1.3.5'
       - name: Install locked frontend dependencies
-        run: npm ci --prefix web --no-audit
+        run: cd web && bun install --frozen-lockfile
       - name: Build embedded SPA
-        run: npm run build --prefix web
+        run: cd web && bun run build
       - name: Check Go formatting
         run: test -z "$(gofmt -l cmd internal webassets)"
       - name: Go tests and race detection

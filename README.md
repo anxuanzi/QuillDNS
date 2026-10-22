@@ -10,6 +10,8 @@ QuillDNS is a lightweight, open-source Go DNS override proxy with a self-contain
 
 ## Features
 
+- Bun-based reproducible frontend builds using a committed `bun.lock`; see [frontend tooling](docs/bun.md).
+
 - DNS over UDP and TCP with local-first A, AAAA, CNAME, TXT, MX, SRV, PTR and CAA responses.
 - Type-specific fallback to DNS upstreams, ordered failover and UDP→TCP retries for truncated replies.
 - Strict DNS client CIDR policy; default loopback-only DNS and management listeners.
@@ -20,11 +22,11 @@ QuillDNS is a lightweight, open-source Go DNS override proxy with a self-contain
 
 ## Quick start (developer)
 
-Prerequisites: Go 1.23+, Node.js 22.12+, npm.
+Prerequisites: Go 1.23+ and Bun 1.3.5+ (pinned in CI and Docker).
 
 ```sh
-npm install --prefix web
-npm run build --prefix web
+cd web && bun install --frozen-lockfile && cd ..
+cd web && bun run build && cd ..
 go mod download
 go test -race ./...
 go run ./cmd/quilldns
@@ -68,14 +70,17 @@ Register `https://dns.example.com/auth/callback` as your provider's redirect URI
 ## Build a single release binary
 
 ```sh
-npm install --prefix web
-npm run build --prefix web
+cd web && bun install --frozen-lockfile && cd ..
+cd web && bun run build && cd ..
 CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o quilldns ./cmd/quilldns
 ```
 
 The Go `webassets` package embeds `webassets/dist` via `go:embed`. **Always build the frontend before building the release binary.** Without it, a placeholder development index may be embedded.
 
 ## Repository layout
+
+The visual identity is maintained in [the branding guide](docs/brand/README.md).
+
 
 | Domain | Documentation |
 |---|---|

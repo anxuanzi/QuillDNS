@@ -15,8 +15,8 @@ Thank you for helping make reliable DNS infrastructure accessible.
 ## Local checks
 
 ```sh
-npm ci --prefix web
-npm run build --prefix web
+cd web && bun install --frozen-lockfile && cd ..
+cd web && bun run build && cd ..
 go mod download
 gofmt -w cmd internal webassets
 go test -race ./...

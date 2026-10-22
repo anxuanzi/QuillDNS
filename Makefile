@@ -1,8 +1,8 @@
 .PHONY: web test vet build verify clean
 
 web:
-	npm ci --prefix web --no-audit
-	npm run build --prefix web
+	cd web && bun install --frozen-lockfile
+	cd web && bun run build
 
 test:
 	go test -race ./...
