@@ -4,6 +4,11 @@ on:
     branches: [main]
   pull_request:
 
+# Keep only the latest browser verification for each branch when commits arrive quickly.
+concurrency:
+  group: quilldns-ui-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   chromium:
     runs-on: ubuntu-latest
@@ -22,10 +27,11 @@ jobs:
         run: |
           cd web && bun install --frozen-lockfile && bun run build && cd ..
           CGO_ENABLED=0 go build -trimpath -o quilldns ./cmd/quilldns
-      - name: Install Playwright Chromium
+      - name: Use preinstalled runner Chrome
         run: |
           python -m pip install playwright==1.56.0
-          python -m playwright install --with-deps chromium
+          command -v google-chrome
+          google-chrome --version
       - name: Test running embedded QuillDNS interface
         run: |
           set -euo pipefail

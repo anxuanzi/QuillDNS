@@ -6,6 +6,7 @@ import struct
 import time
 from pathlib import Path
 import re
+import shutil
 from urllib.request import Request, urlopen
 from playwright.sync_api import expect, sync_playwright
 
@@ -66,7 +67,12 @@ def main():
         time.sleep(0.2)
     assert sum(point["queries"] for point in samples) >= 12, "Historical DNS metrics did not persist"
     with sync_playwright() as runner:
-        browser = runner.chromium.launch(headless=True)
+        # CI uses the already installed runner Chrome. Local developers can
+        # still use the Playwright-managed Chromium build as a fallback.
+        if shutil.which("google-chrome"):
+            browser = runner.chromium.launch(channel="chrome", headless=True)
+        else:
+            browser = runner.chromium.launch(headless=True)
         page = browser.new_page(viewport={"width": 1440, "height": 960}, device_scale_factor=1)
         exceptions = []
         page.on("pageerror", lambda error: exceptions.append(str(error)))
