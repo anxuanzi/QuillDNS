@@ -1,0 +1,11 @@
+.git
+.github
+**/node_modules
+webassets/dist
+quilldns
+*.db
+*.db-shm
+*.db-wal
+tests/e2e/screenshots
+__pycache__
+*.pyc
