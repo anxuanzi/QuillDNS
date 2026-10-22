@@ -161,6 +161,8 @@ def main():
         mobile = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
         mobile.goto(BASE, wait_until="networkidle")
         expect(mobile.get_by_role("heading", name="Overview")).to_be_visible()
+        for label in ("Overview", "DNS Records", "Query Logs", "Settings"):
+            expect(mobile.get_by_role("button", name=label, exact=True)).to_be_visible()
         assert mobile.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"), "mobile viewport overflow"
         assert_chart_geometry(mobile)
         screenshot(mobile, "08-mobile-overview.png")

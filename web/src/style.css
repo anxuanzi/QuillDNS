@@ -254,3 +254,9 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--qd-accent); out
   --vis-tooltip-border-color: var(--qd-border);
   --vis-tooltip-text-color: var(--qd-text);
 }
+
+/* Compact navigation remains fully discoverable on narrow screens; no clipped tabs. */
+@media (max-width: 580px) {
+  .nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; overflow: visible; }
+  .nav-item { min-width: 0; padding: 11px 6px; justify-content: center; white-space: nowrap; }
+}

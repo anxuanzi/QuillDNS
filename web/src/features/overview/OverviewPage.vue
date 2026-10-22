@@ -18,7 +18,7 @@ const cacheHitRate = computed(() => metrics.value?.queries
   ? (100 * (metrics.value.cache ?? 0) / metrics.value.queries).toFixed(1)
   : '0.0')
 const chartData = computed(() => (trend.value?.data ?? []).map(point => ({
-  time: new Date(point.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  time: new Date(point.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false }),
   queries: point.queries,
   latency: Number(point.average_latency_ms.toFixed(3))
 })))
@@ -30,6 +30,12 @@ const latencyCategories = computed(() => ({
   latency: { name: 'Mean processing time (ms)', color: mode.value === 'dark' ? '#a9a7ff' : '#686fe0' }
 }))
 const hasActivity = computed(() => chartData.value.some(item => item.queries > 0))
+const trafficDomain = computed<[number, number]>(() => [
+  0, Math.max(1, Math.ceil(Math.max(0, ...chartData.value.map(point => point.queries)) * 1.18))
+])
+const latencyDomain = computed<[number, number]>(() => [
+  0, Math.max(0.01, Math.max(0, ...chartData.value.map(point => point.latency)) * 1.18)
+])
 const timeTick = (tick: number | Date): string => chartData.value[Math.floor(Number(tick))]?.time ?? ''
 const formatMS = (value: number | undefined) => (value ?? 0).toFixed(2) + ' ms'
 
@@ -96,6 +102,7 @@ async function lookup() {
           v-if="hasActivity"
           :data="chartData"
           :categories="volumeCategories"
+          :y-domain="trafficDomain"
           :height="192"
           :x-formatter="timeTick"
           :x-num-ticks="4"
@@ -124,6 +131,7 @@ async function lookup() {
           v-if="hasActivity"
           :data="chartData"
           :categories="latencyCategories"
+          :y-domain="latencyDomain"
           :height="192"
           :x-formatter="timeTick"
           :x-num-ticks="4"
