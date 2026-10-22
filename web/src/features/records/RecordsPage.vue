@@ -25,7 +25,7 @@ const create = useMutation({
 const update = useMutation({
   mutation: (input: { id: string; data: Editable }) => api.updateRecord(input.id, input.data),
   onSuccess: async () => { pending.value = false; showModal.value = false; notice.value = 'DNS record updated'; await queryCache.invalidateQueries({ key: ['records'] }) },
-  onError: e => { notice.value = e.message }
+  onError: e => { pending.value = false; notice.value = e.message }
 })
 const remove = useMutation({
   mutation: api.deleteRecord,
