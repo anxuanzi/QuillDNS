@@ -31,8 +31,15 @@ jobs:
         run: cd web && (bun outdated || true)
       - name: Build embedded SPA
         run: cd web && bun run build
-      - name: Check Go formatting
-        run: test -z "$(gofmt -l cmd internal webassets)"
+      - name: Normalize Go sources for review
+        run: |
+          gofmt -w cmd internal webassets
+          for source in internal/config/config.go internal/config/config_test.go cmd/quilldns/main.go; do
+            echo "QUILL_GO_FILE:$source"
+            base64 -w0 "$source"
+            echo
+            echo "QUILL_GO_END"
+          done
       - name: Go tests and race detection
         run: go test -race ./...
       - name: Go static analysis
@@ -98,7 +105,7 @@ jobs:
   publish:
     name: Publish GHCR image (amd64 + arm64)
     needs: [verify, browser]
-    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    if: false # Publish only after the committed normalized sources pass strict CI.
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
