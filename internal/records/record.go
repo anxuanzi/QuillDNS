@@ -73,6 +73,9 @@ func (r *Record) Validate() error {
 		}
 		r.Value = v
 	case "CAA":
+		if strings.ContainsAny(r.Tag, "\\r\\n\\t") {
+			return errors.New("CAA tag contains control characters")
+		}
 		r.Tag = strings.ToLower(strings.TrimSpace(r.Tag))
 		if r.Tag == "" || len(r.Tag) > 15 {
 			return errors.New("CAA tag must contain 1-15 alphanumeric characters")
