@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+ "sync/atomic"
 	"time"
 
 	"github.com/anxuanzi/QuillDNS/internal/observability"
@@ -27,7 +28,7 @@ type Server struct {
 	Records   *records.Store
 	Logs      *observability.Collector
 	Client    Upstream
-	Upstreams []string
+	upstreamSet atomic.Value
 	Timeout   time.Duration
 	mu        sync.Mutex
 	cache     map[string]cacheEntry
@@ -36,7 +37,9 @@ type Server struct {
 }
 
 func New(r *records.Store, o *observability.Collector, upstreams []string) *Server {
-	return &Server{Records: r, Logs: o, Client: &dns.Client{Net: "udp", Timeout: 2 * time.Second}, Upstreams: upstreams, Timeout: 2 * time.Second, cache: make(map[string]cacheEntry), MaxCache: 10000}
+	s := &Server{Records:r,Logs:o,Client:&dns.Client{Net:"udp",Timeout:2*time.Second},Timeout:2*time.Second,cache:make(map[string]cacheEntry),MaxCache:10000}
+ s.upstreamSet.Store(append([]string(nil),upstreams...))
+ return s
 }
 func (s *Server) SetAllowedNetworks(networks string) error {
 	prefixes := make([]netip.Prefix, 0)
@@ -139,7 +142,7 @@ func (s *Server) resolve(ctx context.Context, req *dns.Msg) (*dns.Msg, string) {
 		s.mu.Unlock()
 	}
 	var response *dns.Msg
-	for _, addr := range s.Upstreams {
+	for _, addr := range s.UpstreamAddresses() {
 		attempt, cancel := context.WithTimeout(ctx, s.Timeout)
 		r, _, err := s.Client.ExchangeContext(attempt, req, addr)
 		cancel()
@@ -219,4 +222,27 @@ func (s *Server) Lookup(ctx context.Context, name string, qtype uint16) (*dns.Ms
 	req.SetQuestion(dns.Fqdn(name), qtype)
 	r, _ := s.resolve(ctx, req)
 	return r, nil
+}
+
+func(s *Server) UpstreamAddresses()[]string {
+ addresses:=s.upstreamSet.Load().([]string)
+ return append([]string(nil),addresses...)
+}
+
+// SetUpstreams validates and publishes a new immutable resolver configuration.
+func(s *Server) SetUpstreams(addresses []string)error{
+ if len(addresses)==0||len(addresses)>8{return errors.New("configure between 1 and 8 upstreams")}
+ normalized:=make([]string,0,len(addresses))
+ seen:=make(map[string]bool)
+ for _,item:=range addresses{
+  ipport,err:=netip.ParseAddrPort(strings.TrimSpace(item))
+  if err!=nil||!ipport.Addr().IsValid()||ipport.Port()==0{return errors.New("upstream must be a numeric IP:port address")}
+  candidate:=ipport.String()
+  if seen[candidate]{return errors.New("duplicate upstream address")}
+  seen[candidate]=true
+  normalized=append(normalized,candidate)
+ }
+ s.upstreamSet.Store(normalized)
+ s.mu.Lock();s.cache=make(map[string]cacheEntry);s.mu.Unlock()
+ return nil
 }
