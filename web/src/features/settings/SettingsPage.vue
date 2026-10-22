@@ -34,7 +34,7 @@ async function logout() {
         <label v-for="(item, index) in addresses" :key="index" class="field-label">
           Resolver {{ index + 1 }}
           <div class="resolver-input-row">
-            <UInput :model-value="item" placeholder="1.1.1.1:53" class="w-full" @update:model-value="value => changeAddress(index, String(value))" />
+            <UInput :model-value="item" placeholder="1.1.1.1:53" class="w-full" @update:model-value="(value: string | number) => changeAddress(index, String(value))" />
             <UButton icon="i-lucide-trash-2" variant="ghost" color="error" :aria-label="'Remove resolver ' + (index + 1)" @click="removeAddress(index)" />
           </div>
         </label>
