@@ -72,3 +72,5 @@ body { background:#080e18; margin:0; color:#e7eff9; }
 @media(max-width:1150px){.kpis{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:850px){.shell{grid-template-columns:1fr}.sidebar{border-right:0;border-bottom:1px solid #233041;padding:15px}.brand{padding:0 8px 10px}.nav-heading,.sidebar-bottom,.connection{display:none}.nav{display:flex;overflow-x:auto}.nav-item{min-width:max-content}.main{padding:22px}.settings-layout{grid-template-columns:1fr}}
 @media(max-width:580px){.kpis{grid-template-columns:1fr 1fr;gap:10px}.kpi-value{font-size:25px}.grid2{grid-template-columns:1fr}.panel{padding:16px}.footer{flex-direction:column}.toolbar-controls{width:100%}.toolbar-controls > *:first-child{flex:1}}
+
+.resolver-input-row {display:flex;align-items:center;gap:6px;margin-top:5px;}

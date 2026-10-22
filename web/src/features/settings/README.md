@@ -1,3 +1,5 @@
-# Settings view
+# Settings management
 
-Displays management authentication status and the active high-level capabilities. OIDC configuration is read from server environment at startup, not edited through a public browser form. Network listeners and upstreams currently use Go CLI flags. Do not represent unavailable settings as interactive controls.
+The settings page edits ordered public DNS upstreams and displays optional OIDC authentication status. Changes are validated, saved in SQLite and hot-applied to the Go resolver with response-cache invalidation.
+
+OIDC is configured using server environment variables, never stored in browser local storage. When OIDC is disabled, the management service remains loopback-only.
