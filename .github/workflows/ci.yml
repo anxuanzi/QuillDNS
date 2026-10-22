@@ -2,7 +2,17 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']
   pull_request:
+
+# Only the newest main commit is eligible to publish the mutable edge tag.
+# Each versioned tag has its own independent validation and publishing run.
+concurrency:
+  group: quilldns-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
+
+permissions:
+  contents: read
 
 jobs:
   verify:
@@ -33,6 +43,8 @@ jobs:
           git diff --exit-code -- go.mod go.sum
       - name: Build production Go binary
         run: CGO_ENABLED=0 go build -trimpath -o quilldns ./cmd/quilldns
+      - name: Validate Docker Compose example
+        run: docker compose -f deploy/compose.yaml config --quiet
       - name: Build container image
         run: docker build -f deploy/Dockerfile -t quilldns:ci .
       - name: Smoke-test self-contained container and persisted records
@@ -49,10 +61,11 @@ jobs:
           launch() {
             docker rm -f "$container_name" >/dev/null 2>&1 || true
             docker run -d --name "$container_name" --network host \
-              -v "$volume_name":/data quilldns:ci \
-              -data /data/quilldns.db \
-              -dns 127.0.0.1:11053 \
-              -http 127.0.0.1:18080 >/dev/null
+              -v "$volume_name":/data \
+              -e QUILLDNS_DATA_PATH=/data/quilldns.db \
+              -e QUILLDNS_DNS_LISTEN=127.0.0.1:11053 \
+              -e QUILLDNS_HTTP_LISTEN=127.0.0.1:18080 \
+              quilldns:ci >/dev/null
           }
           ready() {
             for i in $(seq 1 25); do
@@ -74,3 +87,70 @@ jobs:
           launch
           ready
           curl -fsS http://127.0.0.1:18080/api/v1/records | grep -q 'smoke.test.'
+
+  # Reuse the exact browser suite (including screenshots), so GHCR images are
+  # published only if both runtime checks and real Chrome UI tests pass.
+  browser:
+    uses: ./.github/workflows/browser-e2e.yml
+    permissions:
+      contents: read
+
+  publish:
+    name: Publish GHCR image (amd64 + arm64)
+    needs: [verify, browser]
+    if: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Require version tags to originate from main
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: git merge-base --is-ancestor "$GITHUB_SHA" refs/remotes/origin/main
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Extract image tags and labels
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/anxuanzi/quilldns
+          flavor: latest=false
+          tags: |
+            type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,prefix=sha-,format=long
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-') }}
+      - name: Authenticate to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push tested image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=quilldns
+          cache-to: type=gha,scope=quilldns,mode=max
+          provenance: true
+          sbom: true
+      - name: Verify published manifest
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          set -euo pipefail
+          first_tag="$(printf '%s\n' "$IMAGE_TAGS" | head -n1)"
+          docker buildx imagetools inspect "$first_tag"
+          echo "Published $first_tag at digest ${{ steps.build.outputs.digest }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Package visibility defaults to private on GHCR; set the package to Public for anonymous pulls." >> "$GITHUB_STEP_SUMMARY"

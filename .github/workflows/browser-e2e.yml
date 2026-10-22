@@ -1,10 +1,9 @@
 name: Browser acceptance and screenshots
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_call:
+  workflow_dispatch:
 
-# Keep only the latest browser verification for each branch when commits arrive quickly.
+# Callable from the main CI pipeline so image publishing is gated on Chrome E2E.
 concurrency:
   group: quilldns-ui-${{ github.ref }}
   cancel-in-progress: true
