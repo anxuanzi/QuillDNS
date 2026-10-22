@@ -23,7 +23,7 @@ def screenshot(page, filename):
 
 def send_local_dns_query(hostname="api.internal.test"):
     """Create actual UDP DNS traffic; the management lookup API does not log queries."""
-    question = b"".join(bytes([len(label)]) + label.encode("ascii") for label in hostname.split(".")) + b"\\x00"
+    question = b"".join(bytes([len(label)]) + label.encode("ascii") for label in hostname.split(".")) + bytes([0])
     packet = struct.pack("!HHHHHH", 0xBEEF, 0x0100, 1, 0, 0, 0) + question + struct.pack("!HH", 1, 1)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as connection:
         connection.settimeout(3)
