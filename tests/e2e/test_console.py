@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import re
 from urllib.request import Request, urlopen
 from playwright.sync_api import expect, sync_playwright
 
@@ -30,6 +31,17 @@ def main():
         assert response and response.status == 200
         expect(page.get_by_role("heading", name="Overview")).to_be_visible()
         expect(page.get_by_text("Total queries")).to_be_visible()
+        # The browser loads in light mode by default and can persist a dark-mode preference.
+        assert page.locator("html").evaluate("(node) => node.classList.contains('light')")
+        page.get_by_role("button", name="Switch to dark theme").click()
+        assert page.locator("html").evaluate("(node) => node.classList.contains('dark')")
+        screenshot(page, "00-dark-overview.png")
+        page.reload(wait_until="networkidle")
+        assert page.locator("html").evaluate("(node) => node.classList.contains('dark')")
+        page.get_by_role("button", name="Switch to light theme").click()
+        assert page.locator("html").evaluate("(node) => node.classList.contains('light')")
+        expect(page.get_by_text("Average response time")).to_be_visible()
+        expect(page.get_by_text("P95 latency")).to_be_visible()
         screenshot(page, "01-overview.png")
 
         page.get_by_role("button", name="DNS Records").click()
@@ -42,10 +54,30 @@ def main():
         screenshot(page, "03-add-record.png")
         page.get_by_label("Hostname").fill("browser.internal.test")
         page.get_by_label("IP address").fill("10.10.20.30")
-        page.get_by_role("button", name="Create Record").click()
+        create_button = page.get_by_role("button", name="Create Record")
+        assert create_button.locator(".animate-spin").count() == 0, "Create button must not show loading before submit"
+        create_button.click()
         expect(page.get_by_text("browser.internal.test.")).to_be_visible(timeout=15000)
         assert any(item["name"] == "browser.internal.test." for item in api("GET", "/api/v1/records")["data"])
         screenshot(page, "04-created-record.png")
+        # A rejected create must release the spinner and keep the editor usable.
+        def fail_create(route):
+            if route.request.method == "POST":
+                route.fulfill(status=500, content_type="application/json", body='{"error":"simulated storage failure"}')
+            else:
+                route.continue_()
+        page.route("**/api/v1/records", fail_create)
+        page.get_by_role("button", name="Add Record").click()
+        page.get_by_label("Hostname").fill("recovery.internal.test")
+        page.get_by_label("IP address").fill("10.0.0.55")
+        rejected_button = page.get_by_role("button", name="Create Record")
+        rejected_button.click()
+        expect(page.get_by_role("alert").get_by_text("simulated storage failure")).to_be_visible(timeout=15000)
+        expect(rejected_button).to_be_enabled()
+        assert rejected_button.locator(".animate-spin").count() == 0, "Create spinner remained active after failure"
+        page.unroute("**/api/v1/records", fail_create)
+        rejected_button.click()
+        expect(page.get_by_text("recovery.internal.test.")).to_be_visible(timeout=15000)
 
         page.get_by_role("button", name="Overview").click()
         page.get_by_label("Domain or hostname").fill("browser.internal.test")
@@ -58,6 +90,15 @@ def main():
         screenshot(page, "06-query-logs.png")
         page.get_by_role("button", name="Settings").click()
         expect(page.get_by_text("Upstream DNS servers")).to_be_visible()
+        apply_button = page.get_by_role("button", name="Apply settings")
+        expect(apply_button).to_be_disabled()
+        assert apply_button.locator(".animate-spin").count() == 0, "Upstream save button must not spin at rest"
+        page.locator(".resolver-input-row input").first.fill("9.9.9.9:53")
+        expect(apply_button).to_be_enabled()
+        apply_button.click()
+        expect(page.get_by_text("Upstream DNS configuration saved and activated")).to_be_visible(timeout=15000)
+        assert apply_button.locator(".animate-spin").count() == 0, "Upstream spinner remained active after save"
+        assert api("GET", "/api/v1/upstreams")["data"][0] == "9.9.9.9:53"
         screenshot(page, "07-settings.png")
 
         mobile = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1)
