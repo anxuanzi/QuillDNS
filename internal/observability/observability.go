@@ -26,35 +26,35 @@ type Event struct {
 	DurationMS float64   `json:"duration_ms"`
 }
 type Summary struct {
-	Queries          uint64  `json:"queries"`
-	Local            uint64  `json:"local"`
-	Cache            uint64  `json:"cache"`
-	Upstream         uint64  `json:"upstream"`
-	Errors           uint64  `json:"errors"`
-	Dropped          uint64  `json:"dropped_logs"`
-	AverageLatencyMS float64 `json:"average_latency_ms"`
-	P95LatencyMS float64 `json:"p95_latency_ms"`
-	P99LatencyMS float64 `json:"p99_latency_ms"`
-	LocalAvgLatencyMS float64 `json:"local_avg_latency_ms"`
-	CacheAvgLatencyMS float64 `json:"cache_avg_latency_ms"`
+	Queries              uint64  `json:"queries"`
+	Local                uint64  `json:"local"`
+	Cache                uint64  `json:"cache"`
+	Upstream             uint64  `json:"upstream"`
+	Errors               uint64  `json:"errors"`
+	Dropped              uint64  `json:"dropped_logs"`
+	AverageLatencyMS     float64 `json:"average_latency_ms"`
+	P95LatencyMS         float64 `json:"p95_latency_ms"`
+	P99LatencyMS         float64 `json:"p99_latency_ms"`
+	LocalAvgLatencyMS    float64 `json:"local_avg_latency_ms"`
+	CacheAvgLatencyMS    float64 `json:"cache_avg_latency_ms"`
 	UpstreamAvgLatencyMS float64 `json:"upstream_avg_latency_ms"`
 }
 type Collector struct {
-	mu           sync.RWMutex
-	events       []Event
-	max          int
-	next         int
-	full         bool
-	summary      Summary
-	totalLatency float64
-	localLatency float64
-	cacheLatency float64
+	mu              sync.RWMutex
+	events          []Event
+	max             int
+	next            int
+	full            bool
+	summary         Summary
+	totalLatency    float64
+	localLatency    float64
+	cacheLatency    float64
 	upstreamLatency float64
-	db           *sql.DB
-	queue        chan Event
-	done         chan struct{}
-	once         sync.Once
-	dropped      atomic.Uint64
+	db              *sql.DB
+	queue           chan Event
+	done            chan struct{}
+	once            sync.Once
+	dropped         atomic.Uint64
 }
 
 func New(max int) *Collector {

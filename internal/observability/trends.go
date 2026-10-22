@@ -7,12 +7,12 @@ import (
 
 // TrendPoint is a five-minute bucket of observed DNS query volume and processing latency.
 type TrendPoint struct {
-	Time time.Time `json:"time"`
-	Queries int64 `json:"queries"`
-	AverageLatencyMS float64 `json:"average_latency_ms"`
-	Local int64 `json:"local"`
-	Cache int64 `json:"cache"`
-	Upstream int64 `json:"upstream"`
+	Time             time.Time `json:"time"`
+	Queries          int64     `json:"queries"`
+	AverageLatencyMS float64   `json:"average_latency_ms"`
+	Local            int64     `json:"local"`
+	Cache            int64     `json:"cache"`
+	Upstream         int64     `json:"upstream"`
 }
 
 // Trend returns the last hour in twelve fixed five-minute buckets, including empty intervals.
