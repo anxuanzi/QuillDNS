@@ -39,11 +39,26 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	}{}
 	c := Config{}
 	entries = append(entries,
-		struct{ key, fallback string; dest *string }{"QUILLDNS_DATA_PATH", DefaultDataPath, &c.DataPath},
-		struct{ key, fallback string; dest *string }{"QUILLDNS_HTTP_LISTEN", DefaultHTTPListen, &c.HTTPListen},
-		struct{ key, fallback string; dest *string }{"QUILLDNS_DNS_LISTEN", DefaultDNSListen, &c.DNSListen},
-		struct{ key, fallback string; dest *string }{"QUILLDNS_UPSTREAMS", DefaultUpstreams, &c.Upstreams},
-		struct{ key, fallback string; dest *string }{"QUILLDNS_ALLOW_NETWORKS", DefaultAllowNetworks, &c.AllowNetworks},
+		struct {
+			key, fallback string
+			dest          *string
+		}{"QUILLDNS_DATA_PATH", DefaultDataPath, &c.DataPath},
+		struct {
+			key, fallback string
+			dest          *string
+		}{"QUILLDNS_HTTP_LISTEN", DefaultHTTPListen, &c.HTTPListen},
+		struct {
+			key, fallback string
+			dest          *string
+		}{"QUILLDNS_DNS_LISTEN", DefaultDNSListen, &c.DNSListen},
+		struct {
+			key, fallback string
+			dest          *string
+		}{"QUILLDNS_UPSTREAMS", DefaultUpstreams, &c.Upstreams},
+		struct {
+			key, fallback string
+			dest          *string
+		}{"QUILLDNS_ALLOW_NETWORKS", DefaultAllowNetworks, &c.AllowNetworks},
 	)
 	for _, entry := range entries {
 		if value, ok := lookupEnv(entry.key); ok {
