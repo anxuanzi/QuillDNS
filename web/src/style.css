@@ -221,3 +221,36 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--qd-accent); out
   contain: layout paint;
 }
 .chart-frame > * { max-width: 100%; }
+
+/* Vue Charts (vue-chrts + Unovis): fixed geometry, readable axes and tooltips. */
+.chart-frame > div, .chart-frame .unovis-xy-container {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+.chart-frame svg { max-width: 100%; }
+.trend-empty {
+  height: 192px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+  color: var(--qd-muted);
+  font-size: 13px;
+  font-weight: 650;
+  text-align: center;
+}
+.trend-empty svg { color: var(--qd-muted-light); }
+.trend-empty small { font-size: 11px; font-weight: 440; color: var(--qd-muted-light); }
+:root {
+  --vis-tooltip-background-color: var(--qd-panel);
+  --vis-tooltip-border-color: var(--qd-border);
+  --vis-tooltip-text-color: var(--qd-text);
+  --vis-tooltip-border-radius: 10px;
+}
+.dark {
+  --vis-tooltip-background-color: var(--qd-panel);
+  --vis-tooltip-border-color: var(--qd-border);
+  --vis-tooltip-text-color: var(--qd-text);
+}

@@ -2,6 +2,8 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useQuery } from '@pinia/colada'
 import { api } from '../../lib/api'
+import { AreaChart, LineChart } from 'vue-chrts'
+import { useColorMode } from '../../lib/theme'
 
 const { data: metrics, refetch: refreshMetrics, error: metricsError } = useQuery({
   key: ['metrics'],
@@ -20,8 +22,15 @@ const chartData = computed(() => (trend.value?.data ?? []).map(point => ({
   queries: point.queries,
   latency: Number(point.average_latency_ms.toFixed(3))
 })))
-const volumeSeries = [{ key: 'queries', label: 'DNS queries' }]
-const latencySeries = [{ key: 'latency', label: 'Avg response time (ms)' }]
+const { mode } = useColorMode()
+const volumeCategories = computed(() => ({
+  queries: { name: 'DNS queries', color: mode.value === 'dark' ? '#65d6e6' : '#098ca3' }
+}))
+const latencyCategories = computed(() => ({
+  latency: { name: 'Mean processing time (ms)', color: mode.value === 'dark' ? '#a9a7ff' : '#686fe0' }
+}))
+const hasActivity = computed(() => chartData.value.some(item => item.queries > 0))
+const timeTick = (tick: number | Date): string => chartData.value[Math.floor(Number(tick))]?.time ?? ''
 const formatMS = (value: number | undefined) => (value ?? 0).toFixed(2) + ' ms'
 
 let interval: ReturnType<typeof setInterval> | undefined
@@ -83,17 +92,23 @@ async function lookup() {
         <span class="chart-legend"><span class="chart-dot" /> Queries</span>
       </div>
       <div class="chart-frame">
-        <UChart
-          v-if="chartData.length"
-          type="area"
+        <AreaChart
+          v-if="hasActivity"
           :data="chartData"
-          index="time"
-          :categories="volumeSeries"
-          :height="186"
-          class="w-full"
-          aria-label="Real DNS queries over the last hour"
+          :categories="volumeCategories"
+          :height="192"
+          :x-formatter="timeTick"
+          :x-num-ticks="4"
+          :y-grid-line="true"
+          :hide-legend="true"
+          :duration="0"
+          aria-label="DNS query volume by five-minute interval"
         />
-        <p v-else class="trend-empty">No traffic history collected yet.</p>
+        <div v-else class="trend-empty">
+          <UIcon name="i-lucide-chart-no-axes-column" class="size-6" />
+          <span>No DNS traffic yet</span>
+          <small>Your first queries will appear here automatically.</small>
+        </div>
       </div>
     </div>
     <div class="panel">
@@ -105,17 +120,23 @@ async function lookup() {
         <span class="chart-legend"><span class="chart-dot" /> Milliseconds</span>
       </div>
       <div class="chart-frame">
-        <UChart
-          v-if="chartData.length"
-          type="line"
+        <LineChart
+          v-if="hasActivity"
           :data="chartData"
-          index="time"
-          :categories="latencySeries"
-          :height="186"
-          class="w-full"
-          aria-label="Average DNS response latency over the last hour"
+          :categories="latencyCategories"
+          :height="192"
+          :x-formatter="timeTick"
+          :x-num-ticks="4"
+          :y-grid-line="true"
+          :hide-legend="true"
+          :duration="0"
+          aria-label="Average DNS processing latency by five-minute interval"
         />
-        <p v-else class="trend-empty">No latency history collected yet.</p>
+        <div v-else class="trend-empty">
+          <UIcon name="i-lucide-timer" class="size-6" />
+          <span>No latency samples yet</span>
+          <small>Processing time is measured from real DNS requests.</small>
+        </div>
       </div>
     </div>
   </section>
