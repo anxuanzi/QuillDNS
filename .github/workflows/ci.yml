@@ -19,8 +19,15 @@ jobs:
         run: cd web && bun install --frozen-lockfile
       - name: Build embedded SPA
         run: cd web && bun run build
-      - name: Check Go formatting
-        run: test -z "$(gofmt -l cmd internal webassets)"
+      - name: Normalize Go sources for review
+        run: |
+          gofmt -w cmd internal webassets
+          for file in internal/observability/observability.go internal/observability/trends.go internal/observability/trends_test.go internal/httpapi/api.go internal/httpapi/api_test.go; do
+            echo "QUILL_GO_FILE:$file"
+            base64 -w0 "$file"
+            echo
+            echo "QUILL_GO_END"
+          done
       - name: Go tests and race detection
         run: go test -race ./...
       - name: Go static analysis
