@@ -77,3 +77,20 @@ body { background:#080e18; margin:0; color:#e7eff9; }
 @media(max-width:580px){.kpis{grid-template-columns:1fr 1fr;gap:10px}.kpi-value{font-size:25px}.grid2{grid-template-columns:1fr}.panel{padding:16px}.footer{flex-direction:column}.toolbar-controls{width:100%}.toolbar-controls > *:first-child{flex:1}}
 
 .resolver-input-row {display:flex;align-items:center;gap:6px;margin-top:5px;}
+
+
+/* Prevent intrinsic-width content from forcing the single-column mobile shell wider
+   than the viewport. Keep the DNS table independently scrollable when necessary. */
+.shell, .main, .panel, .grid2, .kpis, .top-header { min-width: 0; }
+.grid2 > *, .kpis > * { min-width: 0; }
+.main { overflow-wrap: anywhere; }
+.lookup-row > * { min-width: 0; }
+@media (max-width: 580px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .main { width: 100%; min-width: 0; padding: 18px; }
+  .panel { min-width: 0; }
+  .lookup-row { flex-wrap: wrap; }
+  .lookup-row > * { flex: 1 1 130px; }
+  .inline-metric { flex-wrap: wrap; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
