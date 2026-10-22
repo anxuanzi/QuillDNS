@@ -35,3 +35,39 @@ jobs:
         run: CGO_ENABLED=0 go build -trimpath -o quilldns ./cmd/quilldns
       - name: Build container image
         run: docker build -f deploy/Dockerfile -t quilldns:ci .
+      - name: Smoke-test self-contained container and persisted records
+        run: |
+          set -euo pipefail
+          docker volume create quilldns-ci-data
+          cleanup() {
+            docker rm -f quilldns-ci >/dev/null 2>&1 || true
+            docker volume rm quilldns-ci-data >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+          launch() {
+            docker run -d --name quilldns-ci --network host \
+              -v quilldns-ci-data:/data quilldns:ci \
+              -data /data/quilldns.db \
+              -dns 127.0.0.1:11053 \
+              -http 127.0.0.1:18080 >/dev/null
+          }
+          ready() {
+            for i in $(seq 1 25); do
+              if curl -fsS http://127.0.0.1:18080/api/v1/health >/dev/null; then
+                return 0
+              fi
+              sleep 1
+            done
+            docker logs quilldns-ci
+            return 1
+          }
+          launch
+          ready
+          curl -fsS http://127.0.0.1:18080/ | grep -q '/assets/'
+          curl -fsS -X POST http://127.0.0.1:18080/api/v1/records \
+            -H 'Content-Type: application/json' \
+            -d '{"name":"smoke.test","type":"A","value":"10.0.0.20","ttl":60}' >/dev/null
+          docker stop quilldns-ci >/dev/null
+          launch
+          ready
+          curl -fsS http://127.0.0.1:18080/api/v1/records | grep -q 'smoke.test.'
