@@ -18,16 +18,33 @@ const (
 	DefaultDNSListen     = "127.0.0.1:1053"
 	DefaultUpstreams     = "1.1.1.1:53,8.8.8.8:53"
 	DefaultAllowNetworks = "127.0.0.0/8,::1/128"
+
+	// DefaultLogRetentionDays bounds how long persisted query history is kept.
+	DefaultLogRetentionDays = 7
+	// DefaultLogMaxRows bounds how many query-history rows may accumulate,
+	// so a busy resolver can never outgrow its disk through logging alone.
+	DefaultLogMaxRows = 100_000
+)
+
+// Bounds for the query-history retention knobs. The upper limits keep a
+// single operator's history database manageable and keep prune passes short.
+const (
+	MinLogRetentionDays = 1
+	MaxLogRetentionDays = 365
+	MinLogMaxRows       = 1_000
+	MaxLogMaxRows       = 5_000_000
 )
 
 // Config contains only core resolver process settings. OIDC secrets are read
 // separately at startup and must never be exposed through management endpoints.
 type Config struct {
-	DataPath      string
-	HTTPListen    string
-	DNSListen     string
-	Upstreams     string
-	AllowNetworks string
+	DataPath         string
+	HTTPListen       string
+	DNSListen        string
+	Upstreams        string
+	AllowNetworks    string
+	LogRetentionDays int
+	LogMaxRows       int
 }
 
 // Parse accepts a dependency-injected env reader for hermetic unit tests.
@@ -71,6 +88,12 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 			*entry.dest = entry.fallback
 		}
 	}
+	if err := envInt(lookupEnv, "QUILLDNS_LOG_RETENTION_DAYS", DefaultLogRetentionDays, &c.LogRetentionDays); err != nil {
+		return Config{}, err
+	}
+	if err := envInt(lookupEnv, "QUILLDNS_LOG_MAX_ROWS", DefaultLogMaxRows, &c.LogMaxRows); err != nil {
+		return Config{}, err
+	}
 	flags := flag.NewFlagSet("quilldns", flag.ContinueOnError)
 	flags.SetOutput(io.Discard)
 	flags.StringVar(&c.DataPath, "data", c.DataPath, "SQLite database path")
@@ -78,6 +101,8 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	flags.StringVar(&c.DNSListen, "dns", c.DNSListen, "DNS UDP/TCP bind address")
 	flags.StringVar(&c.Upstreams, "upstreams", c.Upstreams, "comma-separated DNS upstream addresses")
 	flags.StringVar(&c.AllowNetworks, "allow-networks", c.AllowNetworks, "comma-separated permitted DNS client CIDRs")
+	flags.IntVar(&c.LogRetentionDays, "log-retention-days", c.LogRetentionDays, "days to keep persisted query history")
+	flags.IntVar(&c.LogMaxRows, "log-max-rows", c.LogMaxRows, "maximum number of persisted query-history rows")
 	if err := flags.Parse(args); err != nil {
 		return Config{}, err
 	}
@@ -99,7 +124,30 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	if err := validNetworks(c.AllowNetworks); err != nil {
 		return Config{}, err
 	}
+	if c.LogRetentionDays < MinLogRetentionDays || c.LogRetentionDays > MaxLogRetentionDays {
+		return Config{}, fmt.Errorf("log retention %dd is outside %d..%d days",
+			c.LogRetentionDays, MinLogRetentionDays, MaxLogRetentionDays)
+	}
+	if c.LogMaxRows < MinLogMaxRows || c.LogMaxRows > MaxLogMaxRows {
+		return Config{}, fmt.Errorf("log row budget %d is outside %d..%d rows",
+			c.LogMaxRows, MinLogMaxRows, MaxLogMaxRows)
+	}
 	return c, nil
+}
+
+// envInt reads an optional integer environment variable into dest, keeping
+// the documented default when unset. Empty and malformed values are rejected.
+func envInt(lookupEnv func(string) (string, bool), key string, fallback int, dest *int) error {
+	if raw, ok := lookupEnv(key); ok {
+		value, err := strconv.Atoi(strings.TrimSpace(raw))
+		if err != nil {
+			return fmt.Errorf("%s must be an integer, got %q", key, raw)
+		}
+		*dest = value
+		return nil
+	}
+	*dest = fallback
+	return nil
 }
 
 func validListener(name, address string) error {
@@ -117,7 +165,7 @@ func validListener(name, address string) error {
 
 func validUpstreams(value string) error {
 	count := 0
-	for _, address := range strings.Split(value, ",") {
+	for address := range strings.SplitSeq(value, ",") {
 		address = strings.TrimSpace(address)
 		if address == "" {
 			return fmt.Errorf("upstream list contains an empty address")
@@ -135,7 +183,7 @@ func validUpstreams(value string) error {
 
 func validNetworks(value string) error {
 	count := 0
-	for _, network := range strings.Split(value, ",") {
+	for network := range strings.SplitSeq(value, ",") {
 		if strings.TrimSpace(network) == "" {
 			return fmt.Errorf("client network list contains an empty CIDR")
 		}

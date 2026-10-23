@@ -28,7 +28,7 @@ func TestLatencySummaryRollingPercentilesAndSourceAverages(t *testing.T) {
 
 func TestTrendSQLiteFiveMinuteBuckets(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "queries.sqlite")
-	c, err := Open(path, 32)
+	c, err := Open(path, 32, 7, 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,12 +38,12 @@ func TestTrendSQLiteFiveMinuteBuckets(t *testing.T) {
 	if err := c.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	reopened, err := Open(path, 32)
+	reopened, err := Open(path, 32, 7, 100000)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer reopened.Close(context.Background())
-	points, err := reopened.Trend(context.Background(), base.Add(time.Minute))
+	points, err := reopened.Trend(context.Background(), base.Add(time.Minute), "1h")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,6 +18,7 @@ import (
 )
 
 type Event struct {
+	ID         int64     `json:"id,omitempty"`
 	Time       time.Time `json:"time"`
 	Name       string    `json:"name"`
 	Type       string    `json:"type"`
@@ -51,10 +53,22 @@ type Collector struct {
 	cacheLatency    float64
 	upstreamLatency float64
 	db              *sql.DB
+	dbRead          *sql.DB
+	retention       time.Duration
+	maxRows         int
 	queue           chan Event
 	done            chan struct{}
 	once            sync.Once
 	dropped         atomic.Uint64
+	histogram       [len(latencyBucketsSec) + 1]atomic.Uint64
+	latencySumUS    atomic.Int64
+	rcodeCounts     sync.Map
+	countMu         sync.Mutex
+	countCache      map[string]countEntry
+	trendMu         sync.Mutex
+	trendCache      map[string]cachedTrend
+	topsMu          sync.Mutex
+	topsCache       map[string]cachedTops
 }
 
 func New(max int) *Collector {
@@ -65,7 +79,9 @@ func New(max int) *Collector {
 }
 
 // Open creates a bounded in-memory collector plus a separate SQLite query-history database.
-func Open(path string, max int) (*Collector, error) {
+// retentionDays and maxRows bound the persisted history so logging can never
+// grow without limit; both come from the operator's config.
+func Open(path string, ringSize, retentionDays, maxRows int) (*Collector, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return nil, err
 	}
@@ -84,12 +100,59 @@ func Open(path string, max int) (*Collector, error) {
 			return nil, fmt.Errorf("initialize query history: %w", err)
 		}
 	}
-	c := New(max)
+	// Older databases lack the epoch column analytics aggregate on; add and
+	// backfill it once, before any reader can touch the table.
+	var epochColumns int
+	if err = db.QueryRow("SELECT COUNT(*) FROM pragma_table_info('queries') WHERE name='epoch'").Scan(&epochColumns); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if epochColumns == 0 {
+		if _, err = db.Exec("ALTER TABLE queries ADD COLUMN epoch INTEGER"); err != nil {
+			db.Close()
+			return nil, err
+		}
+	}
+	if _, err = db.Exec("UPDATE queries SET epoch = CAST(strftime('%s', time) AS INTEGER) WHERE epoch IS NULL"); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("backfill query epochs: %w", err)
+	}
+	read, err := openReadPool(path)
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	c := New(ringSize)
 	c.db = db
-	c.queue = make(chan Event, 4096)
+	c.dbRead = read
+	c.retention = time.Duration(max(retentionDays, 1)) * 24 * time.Hour
+	c.maxRows = max(maxRows, 1)
+	c.queue = make(chan Event, 8192)
 	c.done = make(chan struct{})
 	go c.worker()
 	return c, nil
+}
+
+// openReadPool returns a dedicated connection pool for management reads.
+// In WAL mode readers run alongside the single log writer, so heavy analytic
+// queries never delay query-log flushes on the write connection.
+func openReadPool(path string) (*sql.DB, error) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	uri := url.URL{
+		Scheme:   "file",
+		Path:     filepath.ToSlash(absolute),
+		RawQuery: url.Values{"_pragma": {"busy_timeout(5000)"}}.Encode(),
+	}
+	db, err := sql.Open("sqlite", uri.String())
+	if err != nil {
+		return nil, err
+	}
+	db.SetMaxOpenConns(4)
+	db.SetMaxIdleConns(4)
+	return db, nil
 }
 func (c *Collector) Record(e Event) {
 	c.mu.Lock()
@@ -116,6 +179,12 @@ func (c *Collector) Record(e Event) {
 	c.totalLatency += e.DurationMS
 	c.summary.AverageLatencyMS = c.totalLatency / float64(c.summary.Queries)
 	c.mu.Unlock()
+	// Lifetime latency and rcode telemetry runs lock-free so the DNS hot path
+	// never contends on the ring-buffer mutex.
+	c.recordLatency(e.DurationMS)
+	if counter, _ := c.rcodeCounts.LoadOrStore(e.Rcode, &atomic.Uint64{}); counter != nil {
+		counter.(*atomic.Uint64).Add(1)
+	}
 	if c.queue != nil {
 		select {
 		case c.queue <- e:
@@ -123,6 +192,41 @@ func (c *Collector) Record(e Event) {
 			c.dropped.Add(1)
 		}
 	}
+}
+
+// latencyBucketsSec holds the finite histogram bounds in seconds; the final
+// +Inf bucket is implicit. Bounds match common DNS behavior: sub-millisecond
+// local and cache answers through multi-second upstream timeouts.
+var latencyBucketsSec = [...]float64{0.0005, 0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10}
+
+func (c *Collector) recordLatency(durationMS float64) {
+	seconds := durationMS / 1000
+	// The sum is tracked as integer microseconds: an atomic float type is
+	// unavailable and per-event truncation at microsecond scale is negligible.
+	c.latencySumUS.Add(int64(durationMS * 1000))
+	c.histogram[sort.SearchFloat64s(latencyBucketsSec[:], seconds)].Add(1)
+}
+
+// RcodeCounts returns lifetime response-code counters keyed by rcode name.
+func (c *Collector) RcodeCounts() map[string]uint64 {
+	out := make(map[string]uint64)
+	c.rcodeCounts.Range(func(key, value any) bool {
+		out[key.(string)] = value.(*atomic.Uint64).Load()
+		return true
+	})
+	return out
+}
+
+// LatencyHistogram returns cumulative per-bound counts using Prometheus le
+// semantics, plus the total sum and count in seconds.
+func (c *Collector) LatencyHistogram() (bounds []float64, counts []uint64, sumSeconds float64) {
+	counts = make([]uint64, len(c.histogram))
+	var cumulative uint64
+	for i := range c.histogram {
+		cumulative += c.histogram[i].Load()
+		counts[i] = cumulative
+	}
+	return latencyBucketsSec[:], counts, float64(c.latencySumUS.Load()) / 1e6
 }
 func (c *Collector) Summary() Summary {
 	c.mu.RLock()
@@ -213,10 +317,11 @@ func (c *Collector) worker() {
 			batch = batch[:0]
 			return
 		}
-		stmt, err := tx.Prepare("INSERT INTO queries(time,name,type,client,source,rcode,duration_ms) VALUES(?,?,?,?,?,?,?)")
+		stmt, err := tx.Prepare("INSERT INTO queries(time,epoch,name,type,client,source,rcode,duration_ms) VALUES(?,?,?,?,?,?,?,?)")
 		if err == nil {
 			for _, e := range batch {
-				if _, err = stmt.Exec(e.Time.UTC().Format(time.RFC3339Nano), e.Name, e.Type, e.Client, e.Source, e.Rcode, e.DurationMS); err != nil {
+				start := e.Time.UTC()
+				if _, err = stmt.Exec(start.Format(time.RFC3339Nano), start.Unix(), e.Name, e.Type, e.Client, e.Source, e.Rcode, e.DurationMS); err != nil {
 					break
 				}
 			}
@@ -240,15 +345,15 @@ func (c *Collector) worker() {
 				return
 			}
 			batch = append(batch, e)
-			if len(batch) >= 256 {
+			if len(batch) >= 512 {
 				flush()
 			}
 		case <-ticker.C:
 			flush()
 		case <-prune.C:
-			// Seven-day retention and a fixed maximum row budget.
-			_, _ = c.db.Exec("DELETE FROM queries WHERE time < ?", time.Now().UTC().Add(-7*24*time.Hour).Format(time.RFC3339Nano))
-			_, _ = c.db.Exec("DELETE FROM queries WHERE id NOT IN (SELECT id FROM queries ORDER BY id DESC LIMIT 100000)")
+			// Configurable time retention plus an absolute row budget.
+			_, _ = c.db.Exec("DELETE FROM queries WHERE time < ?", time.Now().UTC().Add(-c.retention).Format(time.RFC3339Nano))
+			_, _ = c.db.Exec("DELETE FROM queries WHERE id NOT IN (SELECT id FROM queries ORDER BY id DESC LIMIT ?)", c.maxRows)
 		}
 	}
 }
@@ -259,7 +364,11 @@ func (c *Collector) Close(ctx context.Context) error {
 	c.once.Do(func() { close(c.queue) })
 	select {
 	case <-c.done:
-		return c.db.Close()
+		err := c.db.Close()
+		if c.dbRead != nil {
+			err = errors.Join(err, c.dbRead.Close())
+		}
+		return err
 	case <-ctx.Done():
 		return errors.Join(ctx.Err(), fmt.Errorf("query log flush incomplete"))
 	}

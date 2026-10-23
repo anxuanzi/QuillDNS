@@ -96,3 +96,48 @@ func TestIPv6ListenAddresses(t *testing.T) {
 		t.Fatalf("unexpected address: %+v", c)
 	}
 }
+
+func TestQueryLogRetentionDefaultsAndBounds(t *testing.T) {
+	got, err := Parse(nil, env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LogRetentionDays != DefaultLogRetentionDays || got.LogMaxRows != DefaultLogMaxRows {
+		t.Fatalf("unexpected retention defaults: %+v", got)
+	}
+	got, err = Parse([]string{"-log-retention-days", "30", "-log-max-rows", "500000"}, env(nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LogRetentionDays != 30 || got.LogMaxRows != 500000 {
+		t.Fatalf("retention flags not respected: %+v", got)
+	}
+	got, err = Parse(nil, env(map[string]string{
+		"QUILLDNS_LOG_RETENTION_DAYS": "365",
+		"QUILLDNS_LOG_MAX_ROWS":       "5000000",
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.LogRetentionDays != 365 || got.LogMaxRows != 5000000 {
+		t.Fatalf("retention env not respected: %+v", got)
+	}
+	for _, testCase := range []struct {
+		name  string
+		env   map[string]string
+		flags []string
+	}{
+		{"zero retention", map[string]string{"QUILLDNS_LOG_RETENTION_DAYS": "0"}, nil},
+		{"retention too long", map[string]string{"QUILLDNS_LOG_RETENTION_DAYS": "366"}, nil},
+		{"retention not a number", map[string]string{"QUILLDNS_LOG_RETENTION_DAYS": "soon"}, nil},
+		{"rows too small", map[string]string{"QUILLDNS_LOG_MAX_ROWS": "10"}, nil},
+		{"rows too large", map[string]string{"QUILLDNS_LOG_MAX_ROWS": "6000000"}, nil},
+		{"rows via flag", nil, []string{"-log-max-rows", "0"}},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got, err := Parse(testCase.flags, env(testCase.env)); err == nil {
+				t.Fatalf("accepted invalid retention: %+v", got)
+			}
+		})
+	}
+}

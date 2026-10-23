@@ -35,7 +35,7 @@ func Normalize(name string) (string, error) {
 	if len(name) > 255 {
 		return "", errors.New("DNS name exceeds 255 bytes")
 	}
-	for _, label := range strings.Split(strings.TrimSuffix(name, "."), ".") {
+	for label := range strings.SplitSeq(strings.TrimSuffix(name, "."), ".") {
 		if len(label) == 0 || len(label) > 63 {
 			return "", errors.New("invalid DNS label length")
 		}

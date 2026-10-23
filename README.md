@@ -44,7 +44,7 @@ Add, edit, and remove **A, AAAA, CNAME, TXT, MX, SRV, PTR, and CAA** records fro
 <td width="50%" valign="top">
 
 ### 📈 Observe everything
-Query history, resolution sources, counters, cache activity, and latency — in the built-in dashboard.
+Searchable query history with server-side pagination, top domains and clients, cache activity, per-upstream health, latency percentiles, and a built-in Prometheus endpoint.
 
 ### 📦 One deployable service
 An embedded Vue 3 SPA, SQLite storage, optional OIDC login, and no external runtime services.
@@ -81,7 +81,7 @@ docker compose logs -f          # inspect resolver logs
 
 ### Option B — Go + Bun
 
-Prerequisites: **Go 1.23+** and **Bun 1.3.5+**.
+Prerequisites: **Go 1.27+** and **Bun 1.3.5+**.
 
 ```bash
 git clone https://github.com/anxuanzi/QuillDNS.git
@@ -144,15 +144,29 @@ Expected local answer: `10.0.0.20`. Requests without a matching local override a
 
 **Record-level fallback is intentional:** if you override `api.example.com A` but not `api.example.com TXT`, its TXT query can still resolve through your public upstream. QuillDNS is an override proxy, **not** automatically an authoritative DNS server for the entire domain.
 
+### Monitoring with Prometheus
+
+`GET /metrics` (same auth as the console) exposes query counters by source and response code, a full latency histogram, cache activity, per-upstream success/error/latency counters, and dropped-log alarms in the Prometheus text format — no exporter or sidecar needed:
+
+```yaml
+scrape_configs:
+  - job_name: quilldns
+    metrics_path: /metrics
+    static_configs:
+      - targets: ['dns-host:8080']
+```
+
+When OIDC is enabled, scrape through your authenticated proxy, or keep the listener loopback-only and run the exporter on the same host. Metric reference: [observability documentation](internal/observability/README.md).
+
 ## The management console
 
 A Vue 3 + Nuxt UI single-page application, built with **Vite and Bun** and embedded directly into the final Go executable.
 
 | Area | What you can do |
 |:--|:--|
-| **Overview** | Inspect resolver activity, local/cache/upstream responses, and latency |
+| **Overview** | Inspect resolver activity, local/cache/upstream responses, latency, top domains and clients, and cache & upstream health |
 | **DNS Records** | Search, add, edit, enable/disable, and remove local records |
-| **Query Logs** | Explore recent DNS activity and response sources |
+| **Query Logs** | Search and filter server-side across the full retained history (name, client, source, response code, type, time window), page through it, and export CSV |
 | **Settings** | Manage DNS upstreams and inspect authentication settings |
 | **DNS Lookup** | Test DNS resolution from the management UI |
 
@@ -169,6 +183,8 @@ The Go server now supports `QUILLDNS_*` environment variables for containerized 
 | `QUILLDNS_HTTP_LISTEN` | `127.0.0.1:8080` | Embedded management UI + API |
 | `QUILLDNS_ALLOW_NETWORKS` | `127.0.0.0/8,::1/128` | Permitted DNS client subnets |
 | `QUILLDNS_UPSTREAMS` | `1.1.1.1:53,8.8.8.8:53` | Comma-separated fallback resolvers |
+| `QUILLDNS_LOG_RETENTION_DAYS` | `7` | Days to keep persisted query history (1–365) |
+| `QUILLDNS_LOG_MAX_ROWS` | `100000` | Cap on persisted query-history rows (1,000–5,000,000) |
 
 The image also accepts the optional `QUILLDNS_OIDC_*` authentication variables. Copy [the Docker Compose environment example](deploy/.env.example) to customize an installation. Run `cd deploy && docker compose up -d` from a cloned repository, or keep a downloaded `compose.yaml` alongside your `.env` file.
 
@@ -244,7 +260,7 @@ The [CI workflow](https://github.com/anxuanzi/QuillDNS/actions/workflows/ci.yml)
 
 QuillDNS is designed for long-term maintainability with clear Go domain packages, module READMEs, Vue feature boundaries, and continuous testing.
 
-**Implemented:** record management, configurable upstreams, first-party analytics, embedded GUI, SQLite persistence, optional OIDC and access restrictions.
+**Implemented:** record management, configurable upstreams, first-party analytics with server-side query history and Prometheus exposition, embedded GUI, SQLite persistence, optional OIDC and access restrictions.
 
 **Before a stable production release:** full DNSSEC/EDNS conformance review, security and OIDC integration review, sustained load/fuzz testing, recovery drills, and reproducible versioned release artifacts. Track current CI results using the badges above; a successful build does not substitute for a security assessment.
 

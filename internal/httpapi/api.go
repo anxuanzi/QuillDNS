@@ -26,9 +26,12 @@ type API struct {
 	DNS       *dnsserver.Server
 	Telemetry *observability.Collector
 	Settings  *settings.Store
+
+	started time.Time
 }
 
 func (a *API) Handler() http.Handler {
+	a.started = time.Now()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"status": "ok", "version": "dev"})
@@ -40,25 +43,15 @@ func (a *API) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/v1/records/{id}", a.update)
 	mux.HandleFunc("DELETE /api/v1/records/{id}", a.delete)
 	mux.HandleFunc("GET /api/v1/metrics/summary", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, a.Telemetry.Summary()) })
-	mux.HandleFunc("GET /api/v1/metrics/trend", func(w http.ResponseWriter, r *http.Request) {
-		points, err := a.Telemetry.Trend(r.Context(), time.Now())
-		if err != nil {
-			problem(w, 503, "query history unavailable")
-			return
-		}
-		respond(w, 200, map[string]any{"data": points, "bucket_seconds": 300})
-	})
-	mux.HandleFunc("GET /api/v1/queries", func(w http.ResponseWriter, r *http.Request) {
-		data, err := a.Telemetry.Recent(r.Context(), 100)
-		if err != nil {
-			problem(w, 503, "query history unavailable")
-			return
-		}
-		respond(w, 200, map[string]any{"data": data})
-	})
+	mux.HandleFunc("GET /api/v1/metrics/trend", a.trend)
+	mux.HandleFunc("GET /api/v1/metrics/tops", a.tops)
+	mux.HandleFunc("GET /api/v1/metrics/resolver", a.resolverHealth)
+	mux.HandleFunc("GET /api/v1/queries", a.queries)
+	mux.HandleFunc("GET /api/v1/queries/export", a.exportQueries)
 	mux.HandleFunc("POST /api/v1/dns/resolve", a.lookup)
 	mux.HandleFunc("GET /api/v1/upstreams", a.getUpstreams)
 	mux.HandleFunc("PUT /api/v1/upstreams", a.putUpstreams)
+	mux.HandleFunc("GET /metrics", a.prometheusMetrics)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")

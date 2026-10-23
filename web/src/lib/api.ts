@@ -12,6 +12,7 @@ export interface DNSRecord {
   tag?: string
 }
 export interface QueryEvent {
+  id?: number
   time: string
   name: string
   type: string
@@ -19,6 +20,56 @@ export interface QueryEvent {
   source: string
   rcode: string
   duration_ms: number
+}
+export interface QueryLogPage {
+  data: QueryEvent[]
+  next_cursor?: number
+  total?: number
+}
+export interface QueryLogFilter {
+  q?: string
+  name?: string
+  client?: string
+  source?: string
+  rcode?: string
+  type?: string
+  since?: string
+  until?: string
+  sort?: 'asc' | 'desc'
+  cursor?: number
+  limit?: number
+  count?: boolean
+}
+export interface TopEntry {
+  value: string
+  count: number
+}
+export interface Tops {
+  domains: TopEntry[]
+  clients: TopEntry[]
+  types: TopEntry[]
+  rcodes: TopEntry[]
+}
+export interface CacheStats {
+  entries: number
+  max: number
+  hits: number
+  misses: number
+  evictions: number
+}
+export interface UpstreamHealth {
+  address: string
+  requests: number
+  errors: number
+  avg_latency_ms: number
+  latency_sum_ms: number
+  status: 'healthy' | 'failing' | 'cooling'
+  last_error?: string
+  last_error_at?: string
+}
+export interface ResolverHealth {
+  cache: CacheStats
+  upstreams: UpstreamHealth[]
 }
 export interface Metrics {
   queries: number
@@ -68,8 +119,25 @@ export const api = {
   updateRecord: (id: string, record: Omit<DNSRecord, 'id'>) => request<DNSRecord>('/records/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(record) }),
   deleteRecord: (id: string) => request<void>('/records/' + encodeURIComponent(id), { method: 'DELETE' }),
   metrics: () => request<Metrics>('/metrics/summary'),
-  trend: () => request<{ data: TrendPoint[]; bucket_seconds: number }>('/metrics/trend'),
-  queries: () => request<{ data: QueryEvent[] }>('/queries'),
+  trend: (window = '1h') => request<{ data: TrendPoint[]; bucket_seconds: number }>('/metrics/trend?window=' + encodeURIComponent(window)),
+  tops: (window = '1h', limit = 10) => request<{ data: Tops }>('/metrics/tops?window=' + encodeURIComponent(window) + '&limit=' + limit),
+  resolver: () => request<ResolverHealth>('/metrics/resolver'),
+  queries: (filter: QueryLogFilter = {}) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(filter)) {
+      if (value === undefined || value === '' || value === false) continue
+      params.set(key, value === true ? '1' : String(value))
+    }
+    return request<QueryLogPage>('/queries?' + params.toString())
+  },
+  queriesExportPath: (filter: QueryLogFilter = {}) => {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(filter)) {
+      if (['cursor', 'count', 'limit'].includes(key) || value === undefined || value === '' || value === false) continue
+      params.set(key, value === true ? '1' : String(value))
+    }
+    return '/api/v1/queries/export?' + params.toString()
+  },
   lookup: (name: string, type: string) => request<{ rcode: string, answers: string[], duration_ms: number }>('/dns/resolve', { method: 'POST', body: JSON.stringify({ name, type }) }),
   upstreams: () => request<{ data: string[] }>('/upstreams'),
   setUpstreams: (addresses: string[]) => request<{ data: string[] }>('/upstreams', { method: 'PUT', body: JSON.stringify({ addresses }) }),

@@ -19,16 +19,14 @@ func TestSQLitePersistenceAndConcurrentReads(t *testing.T) {
 		t.Fatal(err)
 	}
 	var wg sync.WaitGroup
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for j := 0; j < 300; j++ {
+	for range 8 {
+		wg.Go(func() {
+			for range 300 {
 				if _, found := store.Lookup("local.example.", dns.TypeTXT); !found {
 					t.Error("missing record")
 				}
 			}
-		}()
+		})
 	}
 	wg.Wait()
 	if err = store.Close(); err != nil {

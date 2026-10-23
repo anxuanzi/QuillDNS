@@ -42,6 +42,10 @@ All DNS server settings accept environment variables. **Explicit CLI flags win o
 | `QUILLDNS_HTTP_LISTEN` | `127.0.0.1:8080` | Embedded Vue UI + REST API bind address |
 | `QUILLDNS_UPSTREAMS` | `1.1.1.1:53,8.8.8.8:53` | Comma-separated public DNS upstreams |
 | `QUILLDNS_ALLOW_NETWORKS` | `127.0.0.0/8,::1/128` | Allowed DNS client CIDRs |
+| `QUILLDNS_LOG_RETENTION_DAYS` | `7` | Days to keep persisted query history (1–365) |
+| `QUILLDNS_LOG_MAX_ROWS` | `100000` | Cap on persisted query-history rows (1,000–5,000,000) |
+
+Query history is pruned hourly against **both** limits, so logging can never grow without bound even under heavy query load.
 
 Optional OIDC (all values must be configured consistently):
 

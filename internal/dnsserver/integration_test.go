@@ -107,7 +107,7 @@ func TestUDPAndTCPResolutionEndToEnd(t *testing.T) {
 	}
 	q := new(dns.Msg)
 	q.SetQuestion("else.example.test.", dns.TypeA)
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		client := &dns.Client{Net: "udp", Timeout: 3 * time.Second}
 		if _, _, err = client.Exchange(q, udpSocket.LocalAddr().String()); err != nil {
 			t.Fatal(err)

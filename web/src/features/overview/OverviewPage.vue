@@ -9,9 +9,43 @@ const { data: metrics, refetch: refreshMetrics, error: metricsError } = useQuery
   key: ['metrics'],
   query: api.metrics
 })
+const trendWindow = ref('1h')
+const TREND_WINDOWS = [
+  { label: 'Last hour', value: '1h' },
+  { label: 'Last 24 hours', value: '24h' },
+  { label: 'Last 7 days', value: '7d' }
+]
+const trendSpanLabel = computed(() => trendWindow.value === '1h' ? 'last hour' : trendWindow.value === '24h' ? 'last 24 hours' : 'last 7 days')
+const trendBucketLabel = computed(() => {
+  const seconds = trend.value?.bucket_seconds ?? 300
+  return seconds >= 3600 ? (seconds / 3600) + '-hour buckets' : (seconds / 60) + '-minute intervals'
+})
 const { data: trend, refetch: refreshTrend, error: trendError } = useQuery({
-  key: ['metrics', 'trend'],
-  query: api.trend
+  key: () => ['metrics', 'trend', trendWindow.value],
+  query: () => api.trend(trendWindow.value)
+})
+const { data: tops, refetch: refreshTops, error: topsError } = useQuery({
+  key: ['metrics', 'tops'],
+  query: () => api.tops('1h', 8)
+})
+const { data: resolver, refetch: refreshResolver, error: resolverError } = useQuery({
+  key: ['metrics', 'resolver'],
+  query: api.resolver
+})
+
+const topDomains = computed(() => tops.value?.data.domains ?? [])
+const topClients = computed(() => tops.value?.data.clients ?? [])
+const topTypes = computed(() => tops.value?.data.types ?? [])
+const trimDot = (value: string) => value.replace(/\.$/, '')
+const hostOf = (client: string) => client.split(':')[0] || client
+const topShare = (count: number) => {
+  const biggest = topDomains.value[0]?.count ?? 0
+  return (biggest ? 100 * count / biggest : 0).toFixed(1)
+}
+const liveCacheHitRate = computed(() => {
+  const cache = resolver.value?.cache
+  if (!cache || cache.hits + cache.misses === 0) return '—'
+  return (100 * cache.hits / (cache.hits + cache.misses)).toFixed(1) + '%'
 })
 
 const cacheHitRate = computed(() => metrics.value?.queries
@@ -44,6 +78,8 @@ onMounted(() => {
   interval = setInterval(() => {
     void refreshMetrics()
     void refreshTrend()
+    void refreshTops()
+    void refreshResolver()
   }, 5000)
 })
 onUnmounted(() => { if (interval) clearInterval(interval) })
@@ -93,9 +129,12 @@ async function lookup() {
       <div class="chart-head">
         <div>
           <h2 class="section-title">DNS traffic</h2>
-          <p class="chart-note">Query volume · last 60 minutes · 5-minute intervals</p>
+          <p class="chart-note">Query volume · {{ trendSpanLabel }} · {{ trendBucketLabel }}</p>
         </div>
-        <span class="chart-legend"><span class="chart-dot" /> Queries</span>
+        <span class="chart-legend">
+          <USelect v-model="trendWindow" :items="TREND_WINDOWS" class="w-36" aria-label="Trend window" />
+          <span class="chart-dot" /> Queries
+        </span>
       </div>
       <div class="chart-frame">
         <AreaChart
@@ -122,7 +161,7 @@ async function lookup() {
       <div class="chart-head">
         <div>
           <h2 class="section-title">Response latency</h2>
-          <p class="chart-note">Mean DNS processing time · last 60 minutes</p>
+          <p class="chart-note">Mean DNS processing time · {{ trendSpanLabel }}</p>
         </div>
         <span class="chart-legend"><span class="chart-dot" /> Milliseconds</span>
       </div>
@@ -206,6 +245,70 @@ async function lookup() {
       </div>
       <div v-if="lookupError" class="notice-error" role="alert">{{ lookupError }}</div>
       <p class="footnote">Lookup timings include proxy processing and any upstream wait; they are not network round-trip measurements from your browser.</p>
+    </div>
+  </section>
+
+  <section class="grid2" style="margin-top:16px" aria-label="Query analytics and resolver health">
+    <div class="panel">
+      <h2 class="section-title">Top activity · last hour</h2>
+      <p class="subheading" style="margin-top:5px">Most requested domains and busiest clients</p>
+      <div v-if="topsError" class="notice-error" role="alert">Unable to load top activity: {{ topsError.message }}</div>
+      <div v-if="!topDomains.length" class="trend-empty" style="padding:26px 0">
+        <span>No queries logged in the last hour.</span>
+      </div>
+      <div v-if="topDomains.length" class="distribution" style="margin:18px 0 8px">
+        <div v-for="entry in topDomains" :key="entry.value" class="distribution-item">
+          <div class="distribution-label">
+            <span class="mono">{{ trimDot(entry.value) }}</span>
+            <span>{{ entry.count.toLocaleString() }}</span>
+          </div>
+          <div class="meter"><div class="meter-fill" :style="{ width: topShare(entry.count) + '%' }" /></div>
+        </div>
+      </div>
+      <div v-if="topClients.length || topTypes.length" class="metric-mini-grid" aria-label="Busiest clients and record types">
+        <div class="metric-mini">
+          <div class="metric-mini-label">Busiest clients</div>
+          <div v-for="entry in topClients" :key="entry.value" class="top-row">
+            <span class="mono">{{ hostOf(entry.value) }}</span>
+            <strong>{{ entry.count.toLocaleString() }}</strong>
+          </div>
+          <div v-if="!topClients.length" class="top-row muted">—</div>
+        </div>
+        <div class="metric-mini">
+          <div class="metric-mini-label">Record types</div>
+          <div v-for="entry in topTypes" :key="entry.value" class="top-row">
+            <span><UBadge color="neutral" variant="subtle">{{ entry.value }}</UBadge></span>
+            <strong>{{ entry.count.toLocaleString() }}</strong>
+          </div>
+          <div v-if="!topTypes.length" class="top-row muted">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2 class="section-title">Cache &amp; upstream health</h2>
+      <p class="subheading" style="margin-top:5px">Live resolver state since the last restart</p>
+      <div v-if="resolverError" class="notice-error" role="alert">Unable to load resolver health: {{ resolverError.message }}</div>
+      <div class="inline-metric" style="margin-top:17px"><span>Cache hit rate</span><strong>{{ liveCacheHitRate }}</strong></div>
+      <div class="inline-metric"><span>Cache entries</span><strong>{{ resolver?.cache.entries ?? 0 }} / {{ resolver?.cache.max ?? 0 }}</strong></div>
+      <div class="inline-metric"><span>Cache hits</span><strong>{{ (resolver?.cache.hits ?? 0).toLocaleString() }}</strong></div>
+      <div class="inline-metric"><span>Cache misses</span><strong>{{ (resolver?.cache.misses ?? 0).toLocaleString() }}</strong></div>
+      <div class="inline-metric"><span>Cache evictions</span><strong>{{ (resolver?.cache.evictions ?? 0).toLocaleString() }}</strong></div>
+      <div class="upstream-list" aria-label="Upstream resolver health">
+        <div v-for="upstream in resolver?.upstreams ?? []" :key="upstream.address" class="inline-metric">
+          <span class="upstream-label">
+            <span class="dot" :class="upstream.status === 'healthy' ? '' : 'dot-warn'" aria-hidden="true" />
+            <span class="mono">{{ upstream.address }}</span>
+            <UBadge v-if="upstream.status !== 'healthy'" :color="upstream.status === 'cooling' ? 'error' : 'warning'" variant="subtle">{{ upstream.status }}</UBadge>
+          </span>
+          <strong>
+            {{ upstream.requests.toLocaleString() }} req
+            · {{ upstream.errors.toLocaleString() }} err
+            · {{ upstream.avg_latency_ms.toFixed(1) }} ms
+          </strong>
+        </div>
+        <div v-if="!resolver?.upstreams.length" class="inline-metric"><span>No upstream resolvers configured</span><strong>—</strong></div>
+      </div>
     </div>
   </section>
 </template>

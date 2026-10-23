@@ -29,7 +29,7 @@ flowchart TD
 | Record management | `internal/records` | Canonicalization, record invariants, SQLite transactions, immutable snapshots |
 | Resolution | `internal/dnsserver` | UDP/TCP DNS, local-first lookup, positive caching, upstream fallback and client policy |
 | Resolver settings | `internal/settings` | Validated ordered upstreams, durable settings |
-| Observability | `internal/observability` | Bounded in-memory counters, nonblocking asynchronous SQLite query history |
+| Observability | `internal/observability` | Bounded in-memory counters, asynchronous SQLite query history with retention, analytics and Prometheus exposition |
 | Management API | `internal/httpapi` | Versioned request/response protocol, orchestration |
 | Authentication | `internal/auth` | OIDC Code + PKCE, ID token validation and short-lived browser sessions |
 | Frontend | `web/src/features` | View-specific Vue components, Pinia Colada server state and Nuxt UI |
@@ -56,12 +56,12 @@ With no OIDC configuration, management binds only to loopback, and the DNS liste
 ## Current limitations / release blockers
 
 - DNS cache is deliberately conservative and currently caches positive responses only; test full RFC and DNSSEC semantics.
-- Upstreams support UDP/TCP, not yet DNS-over-HTTPS/TLS/QUIC, active health scoring or circuit-breaker selection.
+- Upstreams support UDP/TCP, not yet DNS-over-HTTPS/TLS/QUIC. Consecutive-failure breaking (three failures → 30-second cooldown) is implemented, but full active health scoring is not.
 - TXT/MX/SRV and other common local records are supported, but wildcard records, HTTPS/SVCB/CAA and complete zone-authoritative behavior are not complete.
 - Client access restrictions exist, but sustained-abuse rate limiting and realistic load testing are pending.
 - OIDC is implemented but needs identity-provider integration tests, refresh/session lifecycle review, and security audit before broad exposure.
-- Query history persists with bounded event queues; configurable privacy controls and richer historical analytics are outstanding.
-- Cross-platform packaging and full browser-based end-to-end tests are outstanding.
+- Query history persists with bounded event queues, configurable retention (time and row budget), server-side keyset pagination, filtering, rankings, and an optional Prometheus endpoint; privacy controls for query-name logging are outstanding.
+- Cross-platform AMD64/ARM64 images and browser-based end-to-end tests run in CI; stable versioned release artifacts and reproducible release builds remain outstanding.
 - Automated race-enabled tests and builds are necessary, but do not constitute proof of production readiness.
 
 See [testing](testing.md), [security](../SECURITY.md), and [deployment](../deploy/README.md).

@@ -14,7 +14,7 @@ go test ./internal/records -run '^$' -bench BenchmarkSnapshotLocalLookup -benchm
 
 CI also builds the Vue SPA and checks Go formatting, vet, and tidy dependency metadata. A passing test suite is a prerequisite, **not a production security certification**.
 
-Before a production release, add RFC conformance vectors, fuzz testing, stress tests over IPv4/IPv6, DNSSEC integration, denial-of-service analysis, browser-based E2E tests, and backup/recovery drills.
+Before a production release, add RFC conformance vectors, fuzz testing, stress tests over IPv4/IPv6, DNSSEC integration, denial-of-service analysis, and backup/recovery drills.
 
 
 ## Real browser verification

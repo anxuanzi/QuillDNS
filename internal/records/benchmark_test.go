@@ -10,7 +10,7 @@ func BenchmarkSnapshotLocalLookup(b *testing.B) {
 		b.Fatal(err)
 	}
 	defer s.Close()
-	for i := 0; i < 100; i++ {
+	for i := range 100 {
 		name := "host" + string(rune('a'+i/26)) + string(rune('a'+i%26)) + ".example.test"
 		if err = s.Save(Record{ID: name, Name: name, Type: "A", Value: "10.0.0.1", TTL: 300, Enabled: true}); err != nil {
 			b.Fatal(err)

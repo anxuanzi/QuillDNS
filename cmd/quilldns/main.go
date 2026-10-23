@@ -48,7 +48,7 @@ func main() {
 	}
 	defer store.Close()
 	logsPath := filepath.Join(filepath.Dir(data), "queries.sqlite")
-	telemetry, err := observability.Open(logsPath, 2000)
+	telemetry, err := observability.Open(logsPath, 2000, cfg.LogRetentionDays, cfg.LogMaxRows)
 	if err != nil {
 		slog.Error("open telemetry", "error", err)
 		os.Exit(1)
@@ -101,6 +101,7 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/", api)
+	mux.Handle("GET /metrics", api)
 	mux.Handle("/", webassets.Handler())
 	if oidcManager != nil {
 		oidcManager.Routes(mux)

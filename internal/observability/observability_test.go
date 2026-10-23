@@ -9,7 +9,7 @@ import (
 
 func TestPersistentHistory(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "queries.sqlite")
-	c, err := Open(path, 3)
+	c, err := Open(path, 3, 7, 10000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -17,7 +17,7 @@ func TestPersistentHistory(t *testing.T) {
 	if err := c.Close(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	next, err := Open(path, 3)
+	next, err := Open(path, 3, 7, 10000)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -32,7 +32,7 @@ func TestPersistentHistory(t *testing.T) {
 }
 func TestRingBounded(t *testing.T) {
 	c := New(2)
-	for i := 0; i < 4; i++ {
+	for range 4 {
 		c.Record(Event{Name: "test", Source: "cache", Rcode: "NOERROR"})
 	}
 	if len(c.Events(50)) != 2 || c.Summary().Cache != 4 {
