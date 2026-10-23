@@ -52,47 +52,27 @@ func TrendSpan(window string) (time.Duration, bool) {
 	return time.Duration(span.buckets) * span.width, true
 }
 
-const trendCacheTTL = 10 * time.Second
+const trendCacheTTL = 10 * time.Minute
 
 type cachedTrend struct {
-	points  []TrendPoint
-	seconds int
-	expires time.Time
+	immutable []TrendPoint
+	end       time.Time
+	expires   time.Time
 }
 
 // Trend returns a window of fixed-width buckets, including empty intervals.
-// It reports stored query history when available; the in-memory fallback is
-// limited to the ring. Identical windows are served from a short-lived cache
-// so dashboard polling never re-aggregates the full history per request.
+// Completed buckets are immutable, so they are cached per bucket boundary for
+// the dashboard's polling; the newest, still-open bucket is always computed
+// live so fresh traffic appears within one flush interval.
 func (c *Collector) Trend(ctx context.Context, now time.Time, window string) ([]TrendPoint, error) {
 	span, ok := trendWindows[window]
 	if !ok {
 		return nil, fmt.Errorf("unknown trend window %q", window)
 	}
-	if c.dbRead != nil {
-		c.trendMu.Lock()
-		cached, fresh := c.trendCache[window]
-		c.trendMu.Unlock()
-		if fresh && now.Before(cached.expires) {
-			return cached.points, nil
-		}
-	}
-	points, err := c.computeTrend(ctx, now, span)
-	if err != nil {
-		return nil, err
-	}
-	if c.dbRead != nil {
-		c.trendMu.Lock()
-		if c.trendCache == nil {
-			c.trendCache = make(map[string]cachedTrend)
-		}
-		c.trendCache[window] = cachedTrend{points: points, seconds: int(span.width.Seconds()), expires: now.Add(trendCacheTTL)}
-		c.trendMu.Unlock()
-	}
-	return points, nil
+	return c.computeTrend(ctx, now, window, span)
 }
 
-func (c *Collector) computeTrend(ctx context.Context, now time.Time, span trendWindow) ([]TrendPoint, error) {
+func (c *Collector) computeTrend(ctx context.Context, now time.Time, window string, span trendWindow) ([]TrendPoint, error) {
 	width := span.width
 	end := now.UTC().Truncate(width)
 	start := end.Add(time.Duration(span.buckets-1) * -width)
@@ -103,6 +83,41 @@ func (c *Collector) computeTrend(ctx context.Context, now time.Time, span trendW
 	if c.dbRead == nil {
 		return fillTrendFromRing(c, start, width, points), nil
 	}
+
+	var immutable []TrendPoint
+	c.trendMu.Lock()
+	cached, fresh := c.trendCache[window]
+	c.trendMu.Unlock()
+	if fresh && cached.end.Equal(end) && now.Before(cached.expires) {
+		immutable = cached.immutable
+	} else {
+		immutable = make([]TrendPoint, span.buckets)
+		for i := range immutable {
+			immutable[i].Time = points[i].Time
+		}
+		if err := c.trendRange(ctx, start, start, end, width, immutable); err != nil {
+			return nil, err
+		}
+		c.trendMu.Lock()
+		if c.trendCache == nil {
+			c.trendCache = make(map[string]cachedTrend)
+		}
+		c.trendCache[window] = cachedTrend{immutable: immutable, end: end, expires: now.Add(trendCacheTTL)}
+		c.trendMu.Unlock()
+	}
+	copy(points, immutable)
+
+	if end.Before(now) {
+		if err := c.trendRange(ctx, start, end, end.Add(width), width, points); err != nil {
+			return nil, err
+		}
+	}
+	return points, nil
+}
+
+// trendRange aggregates stored events in [from, to) into the bucket grid whose
+// first bucket starts at gridStart.
+func (c *Collector) trendRange(ctx context.Context, gridStart, from, to time.Time, width time.Duration, out []TrendPoint) error {
 	rows, err := c.dbRead.QueryContext(ctx, fmt.Sprintf(`
 SELECT epoch / %d AS bucket,
 COUNT(*), AVG(duration_ms),
@@ -112,25 +127,25 @@ SUM(CASE WHEN source='upstream' THEN 1 ELSE 0 END)
 FROM queries
 WHERE epoch >= ? AND epoch < ?
 GROUP BY bucket ORDER BY bucket`, int(width.Seconds())),
-		start.Unix(), end.Add(width).Unix())
+		from.Unix(), to.Unix())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
-	firstBucket := start.Unix() / int64(width.Seconds())
+	firstBucket := gridStart.Unix() / int64(width.Seconds())
 	for rows.Next() {
 		var bucket int64
 		var p TrendPoint
 		if err := rows.Scan(&bucket, &p.Queries, &p.AverageLatencyMS, &p.Local, &p.Cache, &p.Upstream); err != nil {
-			return nil, err
+			return err
 		}
 		index := bucket - firstBucket
-		if index >= 0 && index < int64(len(points)) {
-			p.Time = points[index].Time
-			points[index] = p
+		if index >= 0 && index < int64(len(out)) {
+			p.Time = out[index].Time
+			out[index] = p
 		}
 	}
-	return points, rows.Err()
+	return rows.Err()
 }
 
 // fillTrendFromRing buckets the in-memory ring when no history database is open.

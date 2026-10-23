@@ -302,6 +302,7 @@ func (c *Collector) Recent(ctx context.Context, limit int) ([]Event, error) {
 	}
 	return out, rows.Err()
 }
+
 func (c *Collector) worker() {
 	defer close(c.done)
 	ticker := time.NewTicker(time.Second)
@@ -357,6 +358,7 @@ func (c *Collector) worker() {
 		}
 	}
 }
+
 func (c *Collector) Close(ctx context.Context) error {
 	if c.db == nil {
 		return nil

@@ -148,6 +148,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--qd-accent); out
 .live-toggle { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:620; color:var(--qd-muted); cursor:pointer; user-select:none; }
 .live-toggle input { accent-color:var(--qd-accent); width:14px; height:14px; }
 .top-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; font-size:12px; border-top:1px solid var(--qd-border); }
+.top-row > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .top-row:first-of-type { border-top:0; margin-top:4px; }
 .top-row strong { font-variant-numeric:tabular-nums; font-weight:700; }
 .upstream-label { display:flex; align-items:center; gap:9px; min-width:0; }
