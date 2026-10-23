@@ -121,7 +121,7 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
   </section>
   <section class="toolbar">
     <div>
-      <h2 class="section-title">Query Logs</h2>
+      <h2 class="section-title">Query history</h2>
       <p class="subheading">Server-side search over the full retained log — page through millions of rows without loading them</p>
     </div>
     <div class="toolbar-controls">
