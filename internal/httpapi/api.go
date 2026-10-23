@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anxuanzi/QuillDNS/internal/buildinfo"
 	"github.com/anxuanzi/QuillDNS/internal/dnsserver"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
 	"github.com/anxuanzi/QuillDNS/internal/records"
@@ -34,7 +35,7 @@ func (a *API) Handler() http.Handler {
 	a.started = time.Now()
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/health", func(w http.ResponseWriter, r *http.Request) {
-		respond(w, 200, map[string]any{"status": "ok", "version": "dev"})
+		respond(w, 200, map[string]any{"status": "ok", "version": buildinfo.Version})
 	})
 	mux.HandleFunc("GET /api/v1/records", func(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]any{"data": a.Records.List()})

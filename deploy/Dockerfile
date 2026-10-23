@@ -10,12 +10,17 @@ RUN bun run build
 FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
+# VERSION is stamped into the binary (quilldns -version, /api/v1/health and
+# the quilldns_build_info metric). CI passes the git ref or commit SHA.
+ARG VERSION=dev
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 COPY --from=frontend /workspace/webassets/dist/ ./webassets/dist/
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -ldflags="-s -w" -o /quilldns ./cmd/quilldns \
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath \
+    -ldflags="-s -w -X github.com/anxuanzi/QuillDNS/internal/buildinfo.Version=${VERSION}" \
+    -o /quilldns ./cmd/quilldns \
     && mkdir -p /image-data && chmod 0700 /image-data
 
 # Non-root, no runtime shell, no Bun/Node installation, no external services.

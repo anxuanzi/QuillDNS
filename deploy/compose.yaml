@@ -5,6 +5,25 @@ services:
     image: ghcr.io/anxuanzi/quilldns:${QUILLDNS_IMAGE_TAG:-edge}
     restart: unless-stopped
     network_mode: host
+    # Port 53 is a privileged port. With host networking the container shares
+    # the host's network namespace, so the non-root image cannot bind it
+    # (no-new-privileges also strips file capabilities, so setcap does not
+    # help either). Run as root but drop every Linux capability except the
+    # single one needed for the DNS bind; the filesystem stays read-only and
+    # no-new-privileges stays on, keeping the privilege window minimal.
+    user: "0:0"
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    healthcheck:
+      # Shell-free probe handled by the quilldns binary itself. If you change
+      # QUILLDNS_HTTP_LISTEN, change this URL to match.
+      test: ["CMD", "/quilldns", "-healthcheck", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
       QUILLDNS_DATA_PATH: /data/quilldns.db
       QUILLDNS_DNS_LISTEN: ${QUILLDNS_DNS_LISTEN:-127.0.0.1:1053}

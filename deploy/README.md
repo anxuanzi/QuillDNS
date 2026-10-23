@@ -68,7 +68,30 @@ QUILLDNS_DNS_LISTEN=192.168.10.10:1053
 QUILLDNS_ALLOW_NETWORKS=192.168.10.0/24,127.0.0.0/8,::1/128
 ```
 
-Host networking exposes the listener on the **host** address you select. Add host firewall rules. For standard DNS port 53, a non-root process may require an explicitly granted `NET_BIND_SERVICE` capability or a firewall/port-forwarding rule from 53 to 1053; do not grant privileged execution or turn on unrestricted client access just to use port 53.
+Host networking exposes the listener on the **host** address you select. Add host firewall rules.
+
+#### Serving port 53
+
+Ports below 1024 are privileged. With `network_mode: host` the container shares the **host's** network namespace, so its sysctl (`net.ipv4.ip_unprivileged_port_start`, default 1024) applies, and Docker cannot lower it per container in host mode. `cap_add: NET_BIND_SERVICE` alone does **not** help the non-root image: for a non-root user the capability lands in the bounding set but never in the process's effective set, and `no-new-privileges` additionally strips file capabilities, so `setcap` cannot rescue it either.
+
+The shipped `compose.yaml` therefore runs the service as root inside a still-tight sandbox: the root filesystem stays read-only, `no-new-privileges` stays on, and **every** Linux capability is dropped except `NET_BIND_SERVICE` — the single privilege needed to bind the DNS port. With that grant, set:
+
+```dotenv
+QUILLDNS_DNS_LISTEN=0.0.0.0:53
+QUILLDNS_ALLOW_NETWORKS=192.168.10.0/24,127.0.0.0/8,::1/128
+```
+
+Alternatives, in rough order of preference:
+
+1. **Keep the container non-root on port 1053 and redirect on the host** — e.g. an nftables/iptables rule or systemd socket unit forwarding `:53` → `:1053`. The service keeps zero elevated privileges; only the host firewall touches port 53.
+2. **Bridge mode with a port mapping** (`ports: ["53:53/udp", "53:53/tcp"]`, no `network_mode: host`) — Docker's per-network sysctl lets the non-root process bind the mapped port, and external clients keep their source IPs through the DNAT. Traffic that originates on the Docker host itself appears as the bridge gateway IP, which distorts per-client analytics for local probes.
+3. **Root + `NET_BIND_SERVICE`** as the compose file does — full fidelity including host-originated traffic, at the cost of running as root inside the sandbox.
+
+The `docker run` example above binds loopback `:1053` (unprivileged) and needs no capability grant; add `--user 0 --cap-add NET_BIND_SERVICE` only when following option 3.
+
+#### Container health checks
+
+The image is distroless (no shell, no curl/wget), so the compose file uses the binary itself: `quilldns -healthcheck http://127.0.0.1:8080/api/v1/health` exits 0 when the management API reports healthy and non-zero otherwise. Compose restarts an unhealthy container according to `restart: unless-stopped`. If you override `QUILLDNS_HTTP_LISTEN`, update the healthcheck URL to match. The health endpoint is exempt from OIDC, so the probe works with authentication enabled.
 
 ### Remote management / OIDC
 
@@ -97,6 +120,8 @@ CI builds and tests the Go binary, embedded Vue UI, Docker runtime and live brow
 | `v1.2.3-rc.1` | `1.2.3-rc.1`, `sha-<full commit SHA>` (no `latest`) |
 
 Architectures: `linux/amd64` and `linux/arm64`. A GitHub package's public visibility is a package-owner setting; package publishing cannot guarantee that anonymous pulls are enabled. This is an infrastructure packaging feature, not a claim that QuillDNS has completed every production-readiness gate.
+
+Each build stamps its version into the binary (`-ldflags -X .../internal/buildinfo.Version=...`): tags build as their tag name, main builds as the commit SHA. `quilldns -version`, `/api/v1/health` and the `quilldns_build_info` Prometheus metric all report it, so you can always confirm exactly which build production runs.
 
 ### Cross-platform build details
 

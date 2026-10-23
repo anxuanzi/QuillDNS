@@ -45,6 +45,11 @@ type Config struct {
 	AllowNetworks    string
 	LogRetentionDays int
 	LogMaxRows       int
+	// ShowVersion prints the build version and exits when -version is set.
+	ShowVersion bool
+	// HealthcheckURL, when set via -healthcheck, probes the management
+	// health endpoint once and exits — a shell-free container health check.
+	HealthcheckURL string
 }
 
 // Parse accepts a dependency-injected env reader for hermetic unit tests.
@@ -103,6 +108,8 @@ func Parse(args []string, lookupEnv func(string) (string, bool)) (Config, error)
 	flags.StringVar(&c.AllowNetworks, "allow-networks", c.AllowNetworks, "comma-separated permitted DNS client CIDRs")
 	flags.IntVar(&c.LogRetentionDays, "log-retention-days", c.LogRetentionDays, "days to keep persisted query history")
 	flags.IntVar(&c.LogMaxRows, "log-max-rows", c.LogMaxRows, "maximum number of persisted query-history rows")
+	flags.BoolVar(&c.ShowVersion, "version", false, "print the build version and exit")
+	flags.StringVar(&c.HealthcheckURL, "healthcheck", "", "probe the given management health URL once and exit")
 	if err := flags.Parse(args); err != nil {
 		return Config{}, err
 	}

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/anxuanzi/QuillDNS/internal/buildinfo"
 	"github.com/anxuanzi/QuillDNS/internal/observability"
 )
 
@@ -76,7 +77,7 @@ func (a *API) prometheusMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	var b strings.Builder
 	summary := a.Telemetry.Summary()
-	writeGauge(&b, "quilldns_build_info", "Build metadata.", 1, map[string]string{"version": "dev"})
+	writeGauge(&b, "quilldns_build_info", "Build metadata.", 1, map[string]string{"version": buildinfo.Version})
 	writeGauge(&b, "quilldns_uptime_seconds", "Seconds since the process started serving.", time.Since(a.started).Seconds(), nil)
 	for _, source := range []string{"local", "cache", "upstream"} {
 		var count uint64

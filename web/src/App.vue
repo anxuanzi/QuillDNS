@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useColorMode } from './lib/theme'
+import { activePage, type Page } from './lib/navigation'
 import OverviewPage from './features/overview/OverviewPage.vue'
 import RecordsPage from './features/records/RecordsPage.vue'
 import QueriesPage from './features/queries/QueriesPage.vue'
 import SettingsPage from './features/settings/SettingsPage.vue'
 
-type Page = 'overview' | 'records' | 'queries' | 'settings'
-const page = ref<Page>('overview')
+const page = activePage
 const navigation: { key: Page, label: string, icon: string }[] = [
   { key: 'overview', label: 'Overview', icon: 'i-lucide-layout-dashboard' },
   { key: 'records', label: 'DNS Records', icon: 'i-lucide-list-tree' },

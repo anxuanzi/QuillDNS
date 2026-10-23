@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useQuery } from '@pinia/colada'
 import { api, type QueryEvent, type QueryLogFilter } from '../../lib/api'
+import { drilldownClient } from '../../lib/navigation'
 
 const PAGE_SIZE = 100
 const WINDOWS: Array<{ label: string, value: string, seconds: number | null }> = [
@@ -14,6 +15,8 @@ const WINDOWS: Array<{ label: string, value: string, seconds: number | null }> =
 
 const search = ref('')
 const debouncedSearch = ref('')
+const clientFilter = ref<string | null>(drilldownClient.value)
+drilldownClient.value = null
 const sourceFilter = ref('all')
 const rcodeFilter = ref('all')
 const typeFilter = ref('all')
@@ -34,6 +37,7 @@ const { data: metrics } = useQuery({ key: ['metrics'], query: api.metrics })
 const filter = computed<QueryLogFilter>(() => {
   const applied: QueryLogFilter = { sort: newestFirst.value ? 'desc' : 'asc', limit: PAGE_SIZE }
   if (debouncedSearch.value) applied.q = debouncedSearch.value
+  if (clientFilter.value) applied.client = clientFilter.value
   if (sourceFilter.value !== 'all') applied.source = sourceFilter.value
   if (rcodeFilter.value !== 'all') applied.rcode = rcodeFilter.value
   if (typeFilter.value !== 'all') applied.type = typeFilter.value
@@ -79,8 +83,10 @@ watch(search, value => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => { debouncedSearch.value = value.trim() }, 300)
 })
-watch([debouncedSearch, sourceFilter, rcodeFilter, typeFilter, windowFilter, newestFirst], applyFilters)
+watch([debouncedSearch, sourceFilter, rcodeFilter, typeFilter, windowFilter, newestFirst, clientFilter], applyFilters)
 watch(page, () => { void load() })
+
+const clearClientFilter = () => { clientFilter.value = null }
 
 const atFirstPage = computed(() => page.value === 1)
 const hasNextPage = computed(() => rows.value.length === PAGE_SIZE)
@@ -123,6 +129,10 @@ onUnmounted(() => { if (interval) clearInterval(interval) })
     <div>
       <h2 class="section-title">Query history</h2>
       <p class="subheading">Server-side search over the full retained log — page through millions of rows without loading them</p>
+      <button v-if="clientFilter" type="button" class="filter-chip" aria-label="Remove client filter" @click="clearClientFilter">
+        Client: <span class="mono">{{ clientFilter }}</span>
+        <UIcon name="i-lucide-x" class="size-3" />
+      </button>
     </div>
     <div class="toolbar-controls">
       <UInput v-model="search" icon="i-lucide-search" placeholder="Search domains, clients, IPs…" aria-label="Search DNS queries" :disabled="loading" />

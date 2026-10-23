@@ -147,6 +147,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--qd-accent); out
 .pagination-row { display:flex; align-items:center; justify-content:center; gap:16px; margin-top:16px; font-size:13px; }
 .live-toggle { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:620; color:var(--qd-muted); cursor:pointer; user-select:none; }
 .live-toggle input { accent-color:var(--qd-accent); width:14px; height:14px; }
+.filter-chip { display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:4px 10px; border:1px solid var(--qd-border); border-radius:999px; font-size:12px; font-weight:600; color:var(--qd-muted); background:transparent; cursor:pointer; }
+.filter-chip:hover { color:var(--qd-text); border-color:var(--qd-accent); }
+.linklike { padding:0; border:0; background:none; font:inherit; color:inherit; cursor:pointer; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.linklike:hover { color:var(--qd-accent); }
 .top-row { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:7px 0; font-size:12px; border-top:1px solid var(--qd-border); }
 .top-row > span:first-child { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .top-row:first-of-type { border-top:0; margin-top:4px; }

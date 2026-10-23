@@ -144,6 +144,8 @@ jobs:
           cache-to: type=gha,scope=quilldns,mode=max
           provenance: true
           sbom: true
+          build-args: |
+            VERSION=${{ github.ref_type == 'tag' && github.ref_name || github.sha }}
       - name: Verify published manifest
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}

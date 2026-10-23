@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"time"
 
 	"github.com/anxuanzi/QuillDNS/internal/auth"
+	"github.com/anxuanzi/QuillDNS/internal/buildinfo"
 	"github.com/anxuanzi/QuillDNS/internal/config"
 	"github.com/anxuanzi/QuillDNS/internal/dnsserver"
 	"github.com/anxuanzi/QuillDNS/internal/httpapi"
@@ -29,6 +31,13 @@ func main() {
 	if err != nil {
 		slog.Error("invalid QuillDNS configuration", "error", err)
 		os.Exit(2)
+	}
+	if cfg.ShowVersion {
+		fmt.Println("quilldns " + buildinfo.Version)
+		return
+	}
+	if cfg.HealthcheckURL != "" {
+		os.Exit(healthcheck(cfg.HealthcheckURL))
 	}
 	data, listen, dnsListen, upstream, allowed := cfg.DataPath, cfg.HTTPListen, cfg.DNSListen, cfg.Upstreams, cfg.AllowNetworks
 
@@ -136,4 +145,22 @@ func main() {
 	if err := telemetry.Close(shutdown); err != nil {
 		slog.Warn("log flush incomplete", "error", err)
 	}
+}
+
+// healthcheck probes the management health endpoint once and reports success
+// through the exit code, so container runtimes without a shell can still run
+// Docker-style health checks against the static binary.
+func healthcheck(url string) int {
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Get(url)
+	if err != nil {
+		slog.Error("healthcheck failed", "url", url, "error", err)
+		return 1
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		slog.Error("healthcheck failed", "url", url, "status", resp.StatusCode)
+		return 1
+	}
+	return 0
 }

@@ -37,6 +37,6 @@ Query history (`/api/v1/queries`) is server-side paginated with keyset cursors a
 | `quilldns_upstream_requests_total{upstream,result}` | counter | Forwarded exchanges, `result="ok"\|"error"` |
 | `quilldns_upstream_latency_seconds_{sum,count}{upstream}` | counter | Cumulative upstream exchange latency |
 | `quilldns_log_events_dropped_total` | counter | History events dropped under overload |
-| `quilldns_uptime_seconds` / `quilldns_build_info` | gauge | Process age and build metadata |
+| `quilldns_uptime_seconds` / `quilldns_build_info` | gauge | Process age and build metadata; the `version` label carries the stamped build (`-ldflags`), `dev` when unset |
 
 REST: `GET /api/v1/metrics/summary`, `GET /api/v1/metrics/trend?window=1h|24h|7d`, `GET /api/v1/metrics/tops?window=…&limit=…`, `GET /api/v1/metrics/resolver`, `GET /api/v1/queries`, `GET /api/v1/queries/export`, `GET /metrics`. The DNS lookup-testing endpoint also includes `duration_ms` for each requested test.

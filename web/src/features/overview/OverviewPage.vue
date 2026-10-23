@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useQuery } from '@pinia/colada'
 import { api } from '../../lib/api'
+import { openClientQueries } from '../../lib/navigation'
 import { AreaChart, LineChart } from 'vue-chrts'
 import { useColorMode } from '../../lib/theme'
 
@@ -36,8 +37,10 @@ const { data: resolver, refetch: refreshResolver, error: resolverError } = useQu
 const topDomains = computed(() => tops.value?.data.domains ?? [])
 const topClients = computed(() => tops.value?.data.clients ?? [])
 const topTypes = computed(() => tops.value?.data.types ?? [])
+const topRcodes = computed(() => tops.value?.data.rcodes ?? [])
 const trimDot = (value: string) => value.replace(/\.$/, '')
 const hostOf = (client: string) => client.split(':')[0] || client
+const rcodeColor = (rcode: string) => (rcode === 'NOERROR' ? 'success' : rcode === 'NXDOMAIN' ? 'neutral' : 'error')
 const topShare = (count: number) => {
   const biggest = topDomains.value[0]?.count ?? 0
   return (biggest ? 100 * count / biggest : 0).toFixed(1)
@@ -73,9 +76,13 @@ const latencyDomain = computed<[number, number]>(() => [
 const timeTick = (tick: number | Date): string => chartData.value[Math.floor(Number(tick))]?.time ?? ''
 const formatMS = (value: number | undefined) => (value ?? 0).toFixed(2) + ' ms'
 
+// The dashboard polls every five seconds; the Live toggle and a hidden tab
+// both pause the polling so background dashboards never load the server.
+const live = ref(true)
 let interval: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   interval = setInterval(() => {
+    if (!live.value || document.hidden) return
     void refreshMetrics()
     void refreshTrend()
     void refreshTops()
@@ -132,6 +139,7 @@ async function lookup() {
           <p class="chart-note">Query volume · {{ trendSpanLabel }} · {{ trendBucketLabel }}</p>
         </div>
         <span class="chart-legend">
+          <label class="live-toggle" title="Refresh the dashboard every five seconds"><input v-model="live" type="checkbox" aria-label="Auto-refresh dashboard"> Live</label>
           <USelect v-model="trendWindow" :items="TREND_WINDOWS" class="w-36" aria-label="Trend window" />
           <span class="chart-dot" /> Queries
         </span>
@@ -252,7 +260,7 @@ async function lookup() {
   <section class="grid2" style="margin-top:16px" aria-label="Query analytics and resolver health">
     <div class="panel">
       <h2 class="section-title">Top activity · last hour</h2>
-      <p class="subheading" style="margin-top:5px">Most requested domains and busiest clients</p>
+      <p class="subheading" style="margin-top:5px">Most requested domains, busiest clients and response codes</p>
       <div v-if="topsError" class="notice-error" role="alert">Unable to load top activity: {{ topsError.message }}</div>
       <div v-if="!topDomains.length" class="trend-empty" style="padding:26px 0">
         <span>No queries logged in the last hour.</span>
@@ -266,11 +274,11 @@ async function lookup() {
           <div class="meter"><div class="meter-fill" :style="{ width: topShare(entry.count) + '%' }" /></div>
         </div>
       </div>
-      <div v-if="topClients.length || topTypes.length" class="metric-mini-grid" aria-label="Busiest clients and record types">
+      <div v-if="topClients.length || topTypes.length || topRcodes.length" class="metric-mini-grid" aria-label="Busiest clients, record types and response codes">
         <div class="metric-mini">
           <div class="metric-mini-label">Busiest clients</div>
           <div v-for="entry in topClients" :key="entry.value" class="top-row">
-            <span class="mono">{{ hostOf(entry.value) }}</span>
+            <button type="button" class="linklike mono" :aria-label="'Show query history for client ' + hostOf(entry.value)" @click="openClientQueries(hostOf(entry.value))">{{ hostOf(entry.value) }}</button>
             <strong>{{ entry.count.toLocaleString() }}</strong>
           </div>
           <div v-if="!topClients.length" class="top-row muted">—</div>
@@ -282,6 +290,14 @@ async function lookup() {
             <strong>{{ entry.count.toLocaleString() }}</strong>
           </div>
           <div v-if="!topTypes.length" class="top-row muted">—</div>
+        </div>
+        <div class="metric-mini">
+          <div class="metric-mini-label">Response codes</div>
+          <div v-for="entry in topRcodes" :key="entry.value" class="top-row">
+            <span><UBadge :color="rcodeColor(entry.value)" variant="subtle">{{ entry.value }}</UBadge></span>
+            <strong>{{ entry.count.toLocaleString() }}</strong>
+          </div>
+          <div v-if="!topRcodes.length" class="top-row muted">—</div>
         </div>
       </div>
     </div>
