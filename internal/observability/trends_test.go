@@ -110,3 +110,14 @@ func sumQueries(points []TrendPoint) int64 {
 	}
 	return sum
 }
+
+func TestSummarySplitsHardFailuresFromNXDomain(t *testing.T) {
+	c := New(16)
+	for _, rcode := range []string{"NOERROR", "NXDOMAIN", "NXDOMAIN", "SERVFAIL", "REFUSED", "NOERROR"} {
+		c.Record(Event{Source: "upstream", Rcode: rcode, DurationMS: 1})
+	}
+	s := c.Summary()
+	if s.Errors != 4 || s.NXDomain != 2 || s.Failures != 2 {
+		t.Fatalf("unexpected error split: %+v", s)
+	}
+}

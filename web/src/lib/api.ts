@@ -77,6 +77,8 @@ export interface Metrics {
   cache: number
   upstream: number
   errors: number
+  nxdomain: number
+  failures: number
   dropped_logs: number
   average_latency_ms: number
   p95_latency_ms: number

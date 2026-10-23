@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"net"
+	"net/netip"
 	"slices"
 	"strings"
 	"time"
@@ -348,7 +350,7 @@ func (c *Collector) computeTops(ctx context.Context, since time.Time, limit int)
 			return Tops{}, err
 		}
 		domainCounts[name]++
-		clientCounts[client]++
+		clientCounts[normalizeClient(client)]++
 		typeCounts[recordType]++
 		rcodeCounts[rcode]++
 	}
@@ -430,7 +432,7 @@ func (c *Collector) topsRing(since time.Time, limit int) Tops {
 			continue
 		}
 		domainCounts[e.Name]++
-		clientCounts[e.Client]++
+		clientCounts[normalizeClient(e.Client)]++
 		typeCounts[e.Type]++
 		rcodeCounts[e.Rcode]++
 	}
@@ -440,6 +442,20 @@ func (c *Collector) topsRing(since time.Time, limit int) Tops {
 		Types:   topOf(typeCounts, limit),
 		Rcodes:  topOf(rcodeCounts, limit),
 	}
+}
+
+// normalizeClient reduces a recorded client endpoint to its host address so
+// aggregation groups by machine rather than by ephemeral source port. Events
+// recorded before the resolver stored bare IPs keep their ip:port form in
+// history, so both shapes must fold into the same key.
+func normalizeClient(client string) string {
+	if ap, err := netip.ParseAddrPort(client); err == nil {
+		return ap.Addr().String()
+	}
+	if host, _, err := net.SplitHostPort(client); err == nil && host != "" {
+		return host
+	}
+	return client
 }
 
 // topOf ranks counts by descending volume with the value as a stable tiebreak.

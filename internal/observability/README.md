@@ -16,9 +16,9 @@ The summary exposes process-lifetime average latency, rolling p95/p99 latencies 
 
 Trends group persistent events into fixed-width buckets for a selectable window — `1h` (12×5min), `24h` (24×1h) or `7d` (28×6h) — including zero-query intervals. Wider windows widen buckets so aggregation cost stays flat as history grows.
 
-Rankings (`/api/v1/metrics/tops`) aggregate the most queried names, busiest clients, record types and response codes over the same windows.
+Rankings (`/api/v1/metrics/tops`) aggregate the most queried names, busiest clients, record types and response codes over the same windows. Clients are grouped by host address — ephemeral source ports never split one machine across the ranking — and the summary splits non-NOERROR responses into `nxdomain` (normal negative answers) and `failures` (SERVFAIL, REFUSED, …), the way operators read DNS.
 
-Resolver state (`/api/v1/metrics/resolver`) snapshots the response cache (entries, hit/miss/eviction counters) and per-upstream forwarder health: request and error counts, cumulative and average latency, last error, and breaker state. The upstream breaker skips a forwarder after three consecutive exchange failures for 30 seconds, so a dead upstream stops taxing client queries with its full timeout.
+Resolver state (`/api/v1/metrics/resolver`) snapshots the response cache (entries plus hit, miss, and expired-or-evicted counters) and per-upstream forwarder health: request and error counts, cumulative and average latency, last error, and breaker state. The upstream breaker skips a forwarder after three consecutive exchange failures for 30 seconds, so a dead upstream stops taxing client queries with its full timeout.
 
 Query history (`/api/v1/queries`) is server-side paginated with keyset cursors and filterable by name/client substring (`q`, `name`, `client`), source, response code, record type and RFC3339 time range (`since`, `until`), in either sort direction. Page sizes are capped at 500; `count=1` adds the total matching rows. The same filters drive bounded CSV downloads via `/api/v1/queries/export` (50,000-row cap). All filters are parameterized SQL; search input is LIKE-escaped.
 

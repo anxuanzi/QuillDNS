@@ -28,11 +28,16 @@ type Event struct {
 	DurationMS float64   `json:"duration_ms"`
 }
 type Summary struct {
-	Queries              uint64  `json:"queries"`
-	Local                uint64  `json:"local"`
-	Cache                uint64  `json:"cache"`
-	Upstream             uint64  `json:"upstream"`
+	Queries  uint64 `json:"queries"`
+	Local    uint64 `json:"local"`
+	Cache    uint64 `json:"cache"`
+	Upstream uint64 `json:"upstream"`
+	// Errors counts every non-NOERROR response. NXDomain and Failures split it
+	// the way operators read DNS: NXDOMAIN is a normal negative answer, while
+	// SERVFAIL, REFUSED and the rest signal resolver trouble.
 	Errors               uint64  `json:"errors"`
+	NXDomain             uint64  `json:"nxdomain"`
+	Failures             uint64  `json:"failures"`
 	Dropped              uint64  `json:"dropped_logs"`
 	AverageLatencyMS     float64 `json:"average_latency_ms"`
 	P95LatencyMS         float64 `json:"p95_latency_ms"`
@@ -175,6 +180,11 @@ func (c *Collector) Record(e Event) {
 	}
 	if e.Rcode != "NOERROR" {
 		c.summary.Errors++
+		if e.Rcode == "NXDOMAIN" {
+			c.summary.NXDomain++
+		} else {
+			c.summary.Failures++
+		}
 	}
 	c.totalLatency += e.DurationMS
 	c.summary.AverageLatencyMS = c.totalLatency / float64(c.summary.Queries)

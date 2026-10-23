@@ -278,3 +278,36 @@ func TestTrendWindowsShapeBuckets(t *testing.T) {
 		t.Fatal("unexpected bucket widths")
 	}
 }
+
+func TestTopsFoldsClientSourcePortsIntoOneClient(t *testing.T) {
+	base := time.Now().UTC()
+	events := []Event{
+		{Name: "a.test.", Client: "10.0.0.9:41000", Source: "upstream", Rcode: "NOERROR", DurationMS: 1, Time: base.Add(time.Second)},
+		{Name: "a.test.", Client: "10.0.0.9:41001", Source: "upstream", Rcode: "NOERROR", DurationMS: 1, Time: base.Add(2 * time.Second)},
+		{Name: "b.test.", Client: "10.0.0.9", Source: "upstream", Rcode: "NOERROR", DurationMS: 1, Time: base.Add(3 * time.Second)},
+		{Name: "b.test.", Client: "10.0.0.8:52000", Source: "upstream", Rcode: "NOERROR", DurationMS: 1, Time: base.Add(4 * time.Second)},
+	}
+	reopened := persistFlushes(t, filepath.Join(t.TempDir(), "queries.sqlite"), events)
+	topClients := func(tops Tops) []TopEntry { return tops.Clients }
+	for name, tops := range map[string]func() (Tops, error){
+		"sqlite": func() (Tops, error) {
+			return reopened.Tops(context.Background(), base.Add(-time.Hour), 10)
+		},
+		"ring": func() (Tops, error) {
+			c := New(16)
+			for _, e := range events {
+				c.Record(e)
+			}
+			return c.Tops(context.Background(), base.Add(-time.Hour), 10)
+		},
+	} {
+		tops, err := tops()
+		if err != nil {
+			t.Fatal(err)
+		}
+		clients := topClients(tops)
+		if len(clients) != 2 || clients[0].Value != "10.0.0.9" || clients[0].Count != 3 {
+			t.Fatalf("%s: clients not folded by host: %+v", name, clients)
+		}
+	}
+}

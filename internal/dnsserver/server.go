@@ -377,8 +377,14 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, req *dns.Msg) {
 			e.Name = req.Question[0].Name
 			e.Type = dns.TypeToString[req.Question[0].Qtype]
 		}
-		if w.RemoteAddr() != nil {
-			e.Client = w.RemoteAddr().String()
+		if addr := w.RemoteAddr(); addr != nil {
+			// Store the host address only: ephemeral source ports would split
+			// one client across many "busiest clients" buckets.
+			if ap, err := netip.ParseAddrPort(addr.String()); err == nil {
+				e.Client = ap.Addr().String()
+			} else {
+				e.Client = addr.String()
+			}
 		}
 		s.Logs.Record(e)
 	}

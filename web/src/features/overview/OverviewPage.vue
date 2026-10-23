@@ -111,8 +111,8 @@ async function lookup() {
     <div v-for="item in [
       { label: 'Total queries', value: (metrics?.queries ?? 0).toLocaleString(), icon: 'i-lucide-radio-tower', detail: 'Since the last restart' },
       { label: 'Average response time', value: formatMS(metrics?.average_latency_ms), icon: 'i-lucide-timer', detail: 'Overall DNS processing' },
-      { label: 'P95 latency', value: formatMS(metrics?.p95_latency_ms), icon: 'i-lucide-gauge', detail: 'Rolling recent query window' },
-      { label: 'Cache hit rate', value: cacheHitRate + '%', icon: 'i-lucide-database', detail: 'Responses from the local cache' }
+      { label: 'P95 latency', value: formatMS(metrics?.p95_latency_ms), icon: 'i-lucide-gauge', detail: 'Latest in-memory query window' },
+      { label: 'Served from cache', value: cacheHitRate + '%', icon: 'i-lucide-database', detail: 'Share of responses from the local cache' }
     ]" :key="item.label" class="panel kpi">
       <div class="kpi-head">
         <span class="kpi-label">{{ item.label }}</span>
@@ -218,8 +218,9 @@ async function lookup() {
           <strong class="metric-mini-value">{{ formatMS(item.value) }}</strong>
         </div>
       </div>
-      <div class="inline-metric" style="margin-top:17px"><span>P99 response latency · rolling</span><strong>{{ formatMS(metrics?.p99_latency_ms) }}</strong></div>
-      <div class="inline-metric"><span>Errors / non-success responses</span><strong>{{ metrics?.errors ?? 0 }}</strong></div>
+      <div class="inline-metric" style="margin-top:17px"><span>P99 latency · latest in-memory window</span><strong>{{ formatMS(metrics?.p99_latency_ms) }}</strong></div>
+      <div class="inline-metric"><span>Hard errors (SERVFAIL / REFUSED)</span><strong>{{ metrics?.failures ?? 0 }}</strong></div>
+      <div class="inline-metric"><span>Name not found (NXDOMAIN)</span><strong>{{ metrics?.nxdomain ?? 0 }}</strong></div>
       <div class="inline-metric"><span>Dropped query-log events</span><strong>{{ metrics?.dropped_logs ?? 0 }}</strong></div>
     </div>
 
@@ -289,11 +290,11 @@ async function lookup() {
       <h2 class="section-title">Cache &amp; upstream health</h2>
       <p class="subheading" style="margin-top:5px">Live resolver state since the last restart</p>
       <div v-if="resolverError" class="notice-error" role="alert">Unable to load resolver health: {{ resolverError.message }}</div>
-      <div class="inline-metric" style="margin-top:17px"><span>Cache hit rate</span><strong>{{ liveCacheHitRate }}</strong></div>
+      <div class="inline-metric" style="margin-top:17px"><span>Cache hit ratio (hits / lookups)</span><strong>{{ liveCacheHitRate }}</strong></div>
       <div class="inline-metric"><span>Cache entries</span><strong>{{ resolver?.cache.entries ?? 0 }} / {{ resolver?.cache.max ?? 0 }}</strong></div>
       <div class="inline-metric"><span>Cache hits</span><strong>{{ (resolver?.cache.hits ?? 0).toLocaleString() }}</strong></div>
       <div class="inline-metric"><span>Cache misses</span><strong>{{ (resolver?.cache.misses ?? 0).toLocaleString() }}</strong></div>
-      <div class="inline-metric"><span>Cache evictions</span><strong>{{ (resolver?.cache.evictions ?? 0).toLocaleString() }}</strong></div>
+      <div class="inline-metric"><span>Cache entries expired or evicted</span><strong>{{ (resolver?.cache.evictions ?? 0).toLocaleString() }}</strong></div>
       <div class="upstream-list" aria-label="Upstream resolver health">
         <div v-for="upstream in resolver?.upstreams ?? []" :key="upstream.address" class="inline-metric">
           <span class="upstream-label">
