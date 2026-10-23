@@ -7,7 +7,7 @@ RUN bun install --frozen-lockfile
 COPY web/ ./
 RUN bun run build
 
-FROM --platform=$BUILDPLATFORM golang:1.23-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 WORKDIR /src

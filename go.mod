@@ -1,8 +1,6 @@
 module github.com/anxuanzi/QuillDNS
 
-go 1.23.0
-
-toolchain go1.23.12
+go 1.27.3
 
 require (
 	github.com/coreos/go-oidc/v3 v3.12.0
