@@ -53,6 +53,10 @@ An embedded Vue 3 SPA, SQLite storage, optional OIDC login, and no external runt
 </tr>
 </table>
 
+## A Glance of QuillDNS
+<img width="1736" height="1124" alt="QuillDNS" src="https://github.com/user-attachments/assets/3acaefbf-2b1b-424c-aa88-b8aa796bf6a5" />
+
+
 ## Quick start
 
 The simplest way to explore QuillDNS is on your own machine, with DNS and the management UI both bound to loopback.
